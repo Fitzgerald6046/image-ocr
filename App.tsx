@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Upload, ChevronDown, ZoomIn, ZoomOut, RotateCw, X, History, FolderOpen } from 'lucide-react';
+import { Camera, Upload, ChevronDown, ChevronUp, ZoomIn, ZoomOut, RotateCw, X, History, FolderOpen } from 'lucide-react';
 import ImageUpload from './components/ImageUpload';
 import ModelSelector from './components/ModelSelector';
 import RecognizeButton from './components/RecognizeButton';
@@ -191,7 +191,7 @@ const ImagePreviewWithZoom: React.FC<{ uploadedImage: UploadedImageInfo | null }
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState('main'); // 'main', 'settings', 'history', 'batch'
+  const [currentView, setCurrentView] = useState('main'); // 'main', 'settings', 'history'
   const [uploadedImage, setUploadedImage] = useState<UploadedImageInfo | null>(null);
   const [selectedModel, setSelectedModel] = useState('');
   const [recognitionType, setRecognitionType] = useState('auto');
@@ -206,6 +206,7 @@ function App() {
   const [batchFiles, setBatchFiles] = useState<any[]>([]);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportItems, setExportItems] = useState<ExportItem[]>([]);
+  const [showBatchSection, setShowBatchSection] = useState(false);
 
   // 初始化主题
   useEffect(() => {
@@ -522,62 +523,6 @@ function App() {
     );
   }
 
-  if (currentView === 'batch') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
-        {/* 顶部导航栏 */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-blue-100 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setCurrentView('main')}
-                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-                >
-                  ← 返回
-                </button>
-                <h1 className="text-xl font-bold text-gray-800 dark:text-white">批量处理</h1>
-              </div>
-              <ThemeToggle />
-            </div>
-          </div>
-        </header>
-
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <BatchUpload
-                onFilesUploaded={setBatchFiles}
-                maxFiles={20}
-              />
-            </div>
-            <div>
-              <BatchRecognition
-                files={batchFiles}
-                selectedModel={selectedModel}
-                recognitionType={recognitionType}
-                onResults={(results) => {
-                  // 处理批量识别结果
-                  const exportItems: ExportItem[] = results.map(item => ({
-                    fileName: item.file.name,
-                    recognitionType: recognitionType,
-                    model: selectedModel,
-                    provider: 'unknown',
-                    confidence: item.recognitionResult?.confidence || 0,
-                    timestamp: Date.now(),
-                    content: item.recognitionResult?.content || '',
-                    originalContent: item.recognitionResult?.originalContent,
-                    metadata: item.recognitionResult
-                  }));
-                  handleExport(exportItems);
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -597,8 +542,19 @@ function App() {
             
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setCurrentView('batch')}
-                className="flex items-center gap-2 px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                onClick={() => {
+                  // 检查是否已选择AI模型
+                  if (!selectedModel) {
+                    alert('请先选择AI模型后再使用批量处理功能');
+                    return;
+                  }
+                  setShowBatchSection(!showBatchSection);
+                }}
+                className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
+                  showBatchSection 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
               >
                 <FolderOpen className="w-4 h-4" />
                 <span className="hidden sm:inline">批量处理</span>
@@ -749,6 +705,66 @@ function App() {
                 )}
               </div>
             </div>
+            
+            {/* 批量处理区域 */}
+            {showBatchSection && (
+              <div className="bg-white rounded-lg shadow-sm border border-green-100">
+                <div className="p-4 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-5 h-5 bg-green-100 rounded flex items-center justify-center">
+                        <span className="text-green-600 text-xs">📁</span>
+                      </div>
+                      <h2 className="text-lg font-semibold text-gray-800">批量处理</h2>
+                    </div>
+                    <button
+                      onClick={() => setShowBatchSection(false)}
+                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                      title="收起"
+                    >
+                      <ChevronUp className="w-4 h-4 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
+                  {/* 批量上传 */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 mb-3">选择图片文件</h3>
+                    <BatchUpload
+                      onFilesUploaded={setBatchFiles}
+                      maxFiles={20}
+                    />
+                  </div>
+                  
+                  {/* 批量识别 */}
+                  {batchFiles.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">批量识别处理</h3>
+                      <BatchRecognition
+                        files={batchFiles}
+                        selectedModel={selectedModel}
+                        recognitionType={recognitionType}
+                        onResults={(results) => {
+                          // 处理批量识别结果
+                          const exportItems: ExportItem[] = results.map(item => ({
+                            fileName: item.file.name,
+                            recognitionType: recognitionType,
+                            model: selectedModel,
+                            provider: 'unknown',
+                            confidence: item.recognitionResult?.confidence || 0,
+                            timestamp: Date.now(),
+                            content: item.recognitionResult?.content || '',
+                            originalContent: item.recognitionResult?.originalContent,
+                            metadata: item.recognitionResult
+                          }));
+                          handleExport(exportItems);
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
