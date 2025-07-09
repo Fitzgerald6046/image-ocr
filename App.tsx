@@ -303,6 +303,10 @@ function App() {
 
         setUploadedImage(imageInfo);
         setRecognitionResult(null); // 清除之前的识别结果
+        // 如果正在显示批量处理，收起它
+        if (showBatchSection) {
+          setShowBatchSection(false);
+        }
         console.log('✅ 图片上传成功:', result.file.fileName);
       } else {
         throw new Error(result.message || '上传失败');
@@ -331,11 +335,17 @@ function App() {
     console.log('🔍 开始识别流程...');
     console.log('uploadedImage:', uploadedImage);
     console.log('selectedModel:', selectedModel);
+    console.log('isRecognizing:', isRecognizing);
 
     if (!uploadedImage || !selectedModel) {
       const errorMsg = '请确保已上传图片并选择AI模型';
       console.error('❌ 前置条件检查失败:', errorMsg);
       alert(errorMsg);
+      return;
+    }
+
+    if (isRecognizing) {
+      console.log('❌ 正在识别中，跳过重复请求');
       return;
     }
 
@@ -549,6 +559,10 @@ function App() {
                     return;
                   }
                   setShowBatchSection(!showBatchSection);
+                  // 如果展开批量处理，清除单张图片的识别结果
+                  if (!showBatchSection && recognitionResult) {
+                    setRecognitionResult(null);
+                  }
                 }}
                 className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
                   showBatchSection 
@@ -717,13 +731,34 @@ function App() {
                       </div>
                       <h2 className="text-lg font-semibold text-gray-800">批量处理</h2>
                     </div>
-                    <button
-                      onClick={() => setShowBatchSection(false)}
-                      className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                      title="收起"
-                    >
-                      <ChevronUp className="w-4 h-4 text-gray-500" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {batchFiles.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setBatchFiles([]);
+                            setExportItems([]);
+                            setShowExportDialog(false);
+                          }}
+                          className="px-3 py-1 text-sm bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
+                          title="清除所有文件"
+                        >
+                          清除
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setShowBatchSection(false);
+                          // 清除单张图片的识别结果，避免界面混乱
+                          if (recognitionResult) {
+                            setRecognitionResult(null);
+                          }
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                        title="收起"
+                      >
+                        <ChevronUp className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="p-6 space-y-4">
