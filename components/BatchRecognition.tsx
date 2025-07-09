@@ -1,0 +1,420 @@
+import React, { useState } from 'react';
+import { Play, Pause, RotateCcw, Download, Eye, Loader2 } from 'lucide-react';
+import { ErrorHandler, ApiError } from '../utils/errorHandler';
+import ErrorMessage from './ErrorMessage';
+
+interface BatchFileItem {
+  id: string;
+  file: File;
+  status: 'pending' | 'uploading' | 'completed' | 'error';
+  progress: number;
+  fileId?: string;
+  url?: string;
+  error?: ApiError;
+}
+
+interface RecognitionResult {
+  type: string;
+  content: string;
+  confidence: number;
+  model: string;
+  provider?: string;
+  timestamp?: string;
+  originalContent?: string;
+  classification?: any;
+  specialAnalysis?: any;
+}
+
+interface BatchRecognitionItem extends BatchFileItem {
+  recognitionStatus: 'pending' | 'processing' | 'completed' | 'error';
+  recognitionResult?: RecognitionResult;
+  recognitionError?: ApiError;
+}
+
+interface BatchRecognitionProps {
+  files: BatchFileItem[];
+  selectedModel: string;
+  recognitionType: string;
+  onResults: (results: BatchRecognitionItem[]) => void;
+}
+
+const BatchRecognition: React.FC<BatchRecognitionProps> = ({
+  files,
+  selectedModel,
+  recognitionType,
+  onResults
+}) => {
+  const [recognitionItems, setRecognitionItems] = useState<BatchRecognitionItem[]>(() =>
+    files.map(file => ({
+      ...file,
+      recognitionStatus: 'pending'
+    }))
+  );
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const recognizeFile = async (item: BatchRecognitionItem): Promise<BatchRecognitionItem> => {
+    try {
+      // 获取模型配置
+      const savedProviders = localStorage.getItem('aiProviders');
+      const providers = JSON.parse(savedProviders || '[]');
+      
+      const [targetProviderId, targetModelName] = selectedModel.includes('::') 
+        ? selectedModel.split('::', 2)
+        : ['', selectedModel];
+
+      let modelConfig = null;
+      for (const provider of providers) {
+        if (targetProviderId && provider.id !== targetProviderId) continue;
+        
+        const allModels = [...(provider.models || []), ...(provider.customModels || [])];
+        if (allModels.includes(targetModelName)) {
+          modelConfig = {
+            model: targetModelName,
+            apiKey: provider.apiKey,
+            apiUrl: provider.apiUrl,
+            provider: provider.id,
+            isCustom: provider.id.startsWith('custom-')
+          };
+          break;
+        }
+      }
+
+      if (!modelConfig || !modelConfig.apiKey) {
+        throw new Error('未找到模型配置或API密钥');
+      }
+
+      // 发送识别请求
+      const requestData = {
+        fileId: item.fileId,
+        modelConfig,
+        recognitionType
+      };
+
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/recognition`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw ErrorHandler.handleHttpError(response, errorText);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        return {
+          ...item,
+          recognitionStatus: 'completed',
+          recognitionResult: {
+            type: recognitionType,
+            content: result.recognition.content,
+            confidence: result.recognition.confidence,
+            model: result.recognition.model,
+            provider: result.recognition.provider,
+            timestamp: result.recognition.timestamp,
+            originalContent: result.recognition.originalContent,
+            classification: result.recognition.classification,
+            specialAnalysis: result.recognition.specialAnalysis
+          }
+        };
+      } else {
+        throw new Error(result.message || '识别失败');
+      }
+    } catch (error) {
+      let apiError: ApiError;
+      if (error instanceof ApiError) {
+        apiError = error;
+      } else {
+        apiError = ErrorHandler.handle(error, 'recognition');
+      }
+
+      return {
+        ...item,
+        recognitionStatus: 'error',
+        recognitionError: apiError
+      };
+    }
+  };
+
+  const startBatchRecognition = async () => {
+    if (!selectedModel) {
+      alert('请先选择AI模型');
+      return;
+    }
+
+    const completedFiles = files.filter(f => f.status === 'completed');
+    if (completedFiles.length === 0) {
+      alert('没有可识别的文件');
+      return;
+    }
+
+    setIsProcessing(true);
+    setIsPaused(false);
+    setCurrentIndex(0);
+
+    const items = completedFiles.map(file => ({
+      ...file,
+      recognitionStatus: 'pending' as const
+    }));
+    
+    setRecognitionItems(items);
+
+    try {
+      const results: BatchRecognitionItem[] = [];
+      
+      for (let i = 0; i < items.length; i++) {
+        if (isPaused) break;
+        
+        setCurrentIndex(i);
+        const item = items[i];
+        
+        // 更新状态为处理中
+        setRecognitionItems(prev => prev.map(r => 
+          r.id === item.id 
+            ? { ...r, recognitionStatus: 'processing' }
+            : r
+        ));
+
+        // 处理识别
+        const result = await recognizeFile(item);
+        results.push(result);
+        
+        // 更新结果
+        setRecognitionItems(prev => prev.map(r => 
+          r.id === item.id ? result : r
+        ));
+
+        // 短暂延迟避免API限制
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      onResults(results);
+    } finally {
+      setIsProcessing(false);
+      setIsPaused(false);
+    }
+  };
+
+  const pauseRecognition = () => {
+    setIsPaused(true);
+  };
+
+  const resumeRecognition = () => {
+    setIsPaused(false);
+    // 继续从当前位置开始
+    // 这里需要重新实现继续逻辑，暂时简化
+  };
+
+  const resetRecognition = () => {
+    setRecognitionItems(prev => prev.map(item => ({
+      ...item,
+      recognitionStatus: 'pending',
+      recognitionResult: undefined,
+      recognitionError: undefined
+    })));
+    setCurrentIndex(0);
+    setIsProcessing(false);
+    setIsPaused(false);
+  };
+
+  const getStatusIcon = (status: BatchRecognitionItem['recognitionStatus']) => {
+    switch (status) {
+      case 'pending':
+        return <div className="w-4 h-4 bg-gray-300 rounded-full" />;
+      case 'processing':
+        return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      case 'completed':
+        return <div className="w-4 h-4 bg-green-500 rounded-full" />;
+      case 'error':
+        return <div className="w-4 h-4 bg-red-500 rounded-full" />;
+      default:
+        return <div className="w-4 h-4 bg-gray-300 rounded-full" />;
+    }
+  };
+
+  const getStatusText = (status: BatchRecognitionItem['recognitionStatus']) => {
+    switch (status) {
+      case 'pending':
+        return '等待识别';
+      case 'processing':
+        return '识别中...';
+      case 'completed':
+        return '识别完成';
+      case 'error':
+        return '识别失败';
+      default:
+        return '未知状态';
+    }
+  };
+
+  const completedCount = recognitionItems.filter(item => item.recognitionStatus === 'completed').length;
+  const errorCount = recognitionItems.filter(item => item.recognitionStatus === 'error').length;
+  const totalCount = recognitionItems.length;
+
+  return (
+    <div className="space-y-4">
+      {/* 批量识别控制栏 */}
+      <div className="flex items-center justify-between p-4 bg-white rounded-lg border">
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-medium text-gray-900">
+            批量识别
+          </h3>
+          <div className="text-sm text-gray-500">
+            {totalCount > 0 && (
+              <span>
+                完成: {completedCount} / {totalCount}
+                {errorCount > 0 && ` (失败: ${errorCount})`}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {!isProcessing ? (
+            <button
+              onClick={startBatchRecognition}
+              disabled={files.filter(f => f.status === 'completed').length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Play className="w-4 h-4" />
+              开始识别
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              {!isPaused ? (
+                <button
+                  onClick={pauseRecognition}
+                  className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  <Pause className="w-4 h-4" />
+                  暂停
+                </button>
+              ) : (
+                <button
+                  onClick={resumeRecognition}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                >
+                  <Play className="w-4 h-4" />
+                  继续
+                </button>
+              )}
+              <button
+                onClick={resetRecognition}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                重置
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 识别进度 */}
+      {totalCount > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <span>识别进度</span>
+            <span>{Math.round((completedCount / totalCount) * 100)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(completedCount / totalCount) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 识别结果列表 */}
+      {recognitionItems.length > 0 && (
+        <div className="space-y-2">
+          {recognitionItems.map((item, index) => (
+            <div
+              key={item.id}
+              className={`p-4 rounded-lg border transition-all ${
+                index === currentIndex && isProcessing
+                  ? 'border-blue-300 bg-blue-50'
+                  : 'border-gray-200 bg-white'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  {getStatusIcon(item.recognitionStatus)}
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {item.file.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {getStatusText(item.recognitionStatus)}
+                        {item.recognitionResult && (
+                          <span className="ml-2">
+                            置信度: {Math.round(item.recognitionResult.confidence * 100)}%
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    
+                    {item.recognitionStatus === 'completed' && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            // 查看详细结果的逻辑
+                            console.log('View result:', item.recognitionResult);
+                          }}
+                          className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
+                          title="查看结果"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            // 下载结果的逻辑
+                            console.log('Download result:', item.recognitionResult);
+                          }}
+                          className="p-1 text-green-500 hover:text-green-700 transition-colors"
+                          title="下载结果"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {item.recognitionResult && (
+                    <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                      <p className="line-clamp-2">
+                        {item.recognitionResult.content.substring(0, 100)}...
+                      </p>
+                    </div>
+                  )}
+                  
+                  {item.recognitionError && (
+                    <div className="mt-2">
+                      <ErrorMessage
+                        error={item.recognitionError}
+                        className="text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default BatchRecognition;

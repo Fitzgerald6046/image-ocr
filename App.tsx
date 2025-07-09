@@ -1,18 +1,36 @@
-import React, { useState } from 'react';
-import { Settings, Camera, Upload, ChevronDown, ZoomIn, ZoomOut, RotateCw, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Camera, Upload, ChevronDown, ZoomIn, ZoomOut, RotateCw, X, History, FolderOpen } from 'lucide-react';
 import ImageUpload from './components/ImageUpload';
-import SimpleImagePreview from './components/SimpleImagePreview';
 import ModelSelector from './components/ModelSelector';
 import RecognizeButton from './components/RecognizeButton';
 import EnhancedRecognitionResult from './components/EnhancedRecognitionResult';
 import ModelSettings from './model-settings';
 import DebugInfo from './components/DebugInfo';
+import ErrorMessage from './components/ErrorMessage';
+import UploadProgress from './components/UploadProgress';
+import BatchUpload from './components/BatchUpload';
+import BatchRecognition from './components/BatchRecognition';
+import HistoryView from './components/HistoryView';
+import ExportDialog from './components/ExportDialog';
+import ThemeToggle from './components/ThemeToggle';
+import { ErrorHandler, ApiError } from './utils/errorHandler';
+import { FileHandler } from './utils/fileHandler';
+import { HistoryManager, HistoryItem } from './utils/historyManager';
+import { ExportItem } from './utils/exportUtils';
+import { ThemeManager } from './utils/themeManager';
 
 interface UploadedImageInfo {
   file: File;
   fileId: string;
   url: string;
   metadata: any;
+}
+
+interface UploadStatus {
+  isUploading: boolean;
+  progress: number;
+  status: 'uploading' | 'processing' | 'completed' | 'error';
+  error?: ApiError;
 }
 
 interface RecognitionResult {
@@ -173,44 +191,115 @@ const ImagePreviewWithZoom: React.FC<{ uploadedImage: UploadedImageInfo | null }
 };
 
 function App() {
-  const [currentView, setCurrentView] = useState('main'); // 'main' 或 'settings'
+  const [currentView, setCurrentView] = useState('main'); // 'main', 'settings', 'history', 'batch'
   const [uploadedImage, setUploadedImage] = useState<UploadedImageInfo | null>(null);
   const [selectedModel, setSelectedModel] = useState('');
   const [recognitionType, setRecognitionType] = useState('auto');
   const [recognitionResult, setRecognitionResult] = useState<RecognitionResult | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>({
+    isUploading: false,
+    progress: 0,
+    status: 'completed'
+  });
+  const [error, setError] = useState<ApiError | null>(null);
+  const [batchFiles, setBatchFiles] = useState<any[]>([]);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportItems, setExportItems] = useState<ExportItem[]>([]);
+
+  // 初始化主题
+  useEffect(() => {
+    ThemeManager.init();
+  }, []);
 
   const handleImageUpload = async (file: File) => {
+    // 清除之前的错误
+    setError(null);
+    
     try {
-      setIsRecognizing(true);
-      
-      // 上传图片到后端
+      // 1. 文件验证
+      const validation = FileHandler.validateFile(file);
+      if (!validation.isValid) {
+        throw ErrorHandler.handle(new Error(validation.error!), 'file');
+      }
+
+      // 2. 开始上传流程
+      setUploadStatus({
+        isUploading: true,
+        progress: 0,
+        status: 'uploading'
+      });
+
+      // 3. 检查是否需要压缩
+      let uploadFile = file;
+      if (FileHandler.shouldCompress(file)) {
+        setUploadStatus(prev => ({
+          ...prev,
+          status: 'processing',
+          progress: 20
+        }));
+
+        try {
+          const compressed = await FileHandler.compressImage(file, {
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.8
+          });
+          uploadFile = compressed.file;
+          console.log(`📦 图片压缩完成: ${compressed.compressionRatio}% 压缩率`);
+        } catch (compressionError) {
+          console.warn('图片压缩失败，使用原图:', compressionError);
+        }
+      }
+
+      // 4. 创建FormData
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', uploadFile);
       
       console.log('🚀 开始上传图片:', file.name);
       
+      // 5. 上传到后端
+      setUploadStatus(prev => ({
+        ...prev,
+        status: 'uploading',
+        progress: 50
+      }));
+
       const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/upload`, {
         method: 'POST',
         body: formData
       });
       
+      // 6. 处理HTTP错误
       if (!response.ok) {
-        throw new Error(`上传失败: ${response.statusText}`);
+        const errorText = await response.text();
+        throw ErrorHandler.handleHttpError(response, errorText);
       }
       
+      // 7. 解析响应
+      setUploadStatus(prev => ({
+        ...prev,
+        progress: 80
+      }));
+
       const result = await response.json();
       console.log('📦 后端返回结果:', result);
       
       if (result.success) {
-        const imageInfo = {
+        const imageInfo: UploadedImageInfo = {
           file,
           fileId: result.file.id,
           url: `${window.location.protocol}//${window.location.hostname}:3001${result.file.url}`,
           metadata: result.file.metadata
         };
         
-        console.log('✅ 设置uploadedImage状态:', imageInfo);
+        // 8. 完成上传
+        setUploadStatus({
+          isUploading: false,
+          progress: 100,
+          status: 'completed'
+        });
+
         setUploadedImage(imageInfo);
         setRecognitionResult(null); // 清除之前的识别结果
         console.log('✅ 图片上传成功:', result.file.fileName);
@@ -219,9 +308,21 @@ function App() {
       }
     } catch (error) {
       console.error('Upload error:', error);
-      alert('图片上传失败：' + (error instanceof Error ? error.message : '未知错误'));
-    } finally {
-      setIsRecognizing(false);
+      
+      let apiError: ApiError;
+      if (error instanceof ApiError) {
+        apiError = error;
+      } else {
+        apiError = ErrorHandler.handle(error, 'network');
+      }
+      
+      setError(apiError);
+      setUploadStatus({
+        isUploading: false,
+        progress: 0,
+        status: 'error',
+        error: apiError
+      });
     }
   };
 
@@ -331,7 +432,7 @@ function App() {
       console.log('✅ 后端响应:', result);
       
       if (result.success) {
-        setRecognitionResult({
+        const recognitionData = {
           type: recognitionType,
           content: result.recognition.content,
           confidence: result.recognition.confidence,
@@ -341,64 +442,232 @@ function App() {
           originalContent: result.recognition.originalContent,
           classification: result.recognition.classification,
           specialAnalysis: result.recognition.specialAnalysis
-        });
+        };
+        
+        setRecognitionResult(recognitionData);
+        
+        // 保存到历史记录
+        if (uploadedImage) {
+          HistoryManager.saveRecord({
+            fileName: uploadedImage.file.name,
+            fileSize: uploadedImage.file.size,
+            fileType: uploadedImage.file.type,
+            recognitionType: recognitionType,
+            model: recognitionData.model,
+            provider: recognitionData.provider || 'unknown',
+            result: {
+              content: recognitionData.content,
+              confidence: recognitionData.confidence,
+              originalContent: recognitionData.originalContent,
+              classification: recognitionData.classification,
+              specialAnalysis: recognitionData.specialAnalysis
+            },
+            previewUrl: uploadedImage.url
+          });
+        }
+        
         console.log('✅ 图片识别完成');
       } else {
         throw new Error(result.message || '识别失败');
       }
     } catch (error) {
       console.error('❌ 识别过程出错:', error);
-      const errorMessage = error instanceof Error ? error.message : '未知错误';
       
-      // 检查是否为token限制问题
-      if (errorMessage.includes('token限制') || errorMessage.includes('被截断')) {
-        alert(`识别失败：${errorMessage}\n\n💡 解决建议：\n1. 尝试使用更简单的识别类型（如"智能识别"）\n2. 压缩图片大小后重试\n3. 如果是文档，尝试分页识别\n4. 使用其他AI模型（如DeepSeek或OpenAI）`);
+      let apiError: ApiError;
+      if (error instanceof ApiError) {
+        apiError = error;
       } else {
-        alert('识别失败：' + errorMessage);
+        apiError = ErrorHandler.handle(error, 'recognition');
       }
+      
+      setError(apiError);
     } finally {
       setIsRecognizing(false);
     }
   };
 
+  // 处理历史记录查看
+  const handleViewHistoryResult = (item: HistoryItem) => {
+    setRecognitionResult({
+      type: item.recognitionType,
+      content: item.result.content,
+      confidence: item.result.confidence,
+      model: item.model,
+      provider: item.provider,
+      timestamp: new Date(item.timestamp).toISOString(),
+      originalContent: item.result.originalContent,
+      classification: item.result.classification,
+      specialAnalysis: item.result.specialAnalysis
+    });
+    setCurrentView('main');
+  };
+
+  // 处理导出
+  const handleExport = (items: ExportItem[]) => {
+    setExportItems(items);
+    setShowExportDialog(true);
+  };
+
+  // 不同视图的渲染
   if (currentView === 'settings') {
     return <ModelSettings onBack={() => setCurrentView('main')} />;
   }
 
+  if (currentView === 'history') {
+    return (
+      <HistoryView
+        onBack={() => setCurrentView('main')}
+        onViewResult={handleViewHistoryResult}
+      />
+    );
+  }
+
+  if (currentView === 'batch') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
+        {/* 顶部导航栏 */}
+        <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-blue-100 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setCurrentView('main')}
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  ← 返回
+                </button>
+                <h1 className="text-xl font-bold text-gray-800 dark:text-white">批量处理</h1>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <BatchUpload
+                onFilesUploaded={setBatchFiles}
+                maxFiles={20}
+              />
+            </div>
+            <div>
+              <BatchRecognition
+                files={batchFiles}
+                selectedModel={selectedModel}
+                recognitionType={recognitionType}
+                onResults={(results) => {
+                  // 处理批量识别结果
+                  const exportItems: ExportItem[] = results.map(item => ({
+                    fileName: item.file.name,
+                    recognitionType: recognitionType,
+                    model: selectedModel,
+                    provider: 'unknown',
+                    confidence: item.recognitionResult?.confidence || 0,
+                    timestamp: Date.now(),
+                    content: item.recognitionResult?.content || '',
+                    originalContent: item.recognitionResult?.originalContent,
+                    metadata: item.recognitionResult
+                  }));
+                  handleExport(exportItems);
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white dark:from-gray-900 dark:to-gray-800">
       {/* 顶部标题栏 */}
-      <header className="bg-white shadow-sm border-b border-blue-100">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-center">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Camera className="w-6 h-6 text-blue-600" />
+      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-blue-100 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 py-4 md:py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <Camera className="w-5 h-5 md:w-6 md:h-6 text-blue-600 dark:text-blue-400" />
               </div>
-              <div className="text-center">
-                <h1 className="text-2xl font-bold text-gray-800">智能图片识别系统</h1>
-                <p className="text-gray-600 text-sm">支持多种AI模型，智能识别图片内容，提供专业的分析与处理服务</p>
+              <div>
+                <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white">智能图片识别系统</h1>
+                <p className="text-gray-600 dark:text-gray-300 text-xs md:text-sm hidden sm:block">支持多种AI模型，智能识别图片内容，提供专业的分析与处理服务</p>
               </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentView('batch')}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              >
+                <FolderOpen className="w-4 h-4" />
+                <span className="hidden sm:inline">批量处理</span>
+              </button>
+              
+              <button
+                onClick={() => setCurrentView('history')}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                <History className="w-4 h-4" />
+                <span className="hidden sm:inline">历史记录</span>
+              </button>
+              
+              <button
+                onClick={() => setCurrentView('settings')}
+                className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              >
+                <span className="hidden sm:inline">设置</span>
+                <span className="sm:hidden">⚙️</span>
+              </button>
+              
+              <ThemeToggle />
             </div>
           </div>
         </div>
       </header>
 
       {/* 主要内容区域 */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main className="max-w-7xl mx-auto px-4 py-4 md:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
           {/* 左侧：图片上传与配置 */}
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {/* 图片上传 */}
             <div className="bg-white rounded-lg shadow-sm border border-blue-100">
-              <div className="p-4 border-b border-gray-100">
+              <div className="p-3 md:p-4 border-b border-gray-100">
                 <div className="flex items-center gap-2">
-                  <Upload className="w-5 h-5 text-blue-600" />
-                  <h2 className="text-lg font-semibold text-gray-800">图片上传与配置</h2>
+                  <Upload className="w-4 h-4 md:w-5 md:h-5 text-blue-600" />
+                  <h2 className="text-base md:text-lg font-semibold text-gray-800">图片上传与配置</h2>
                 </div>
               </div>
-              <div className="p-6">
+              <div className="p-4 md:p-6">
                 <ImageUpload onImageUpload={handleImageUpload} />
+                
+                {/* 上传进度显示 */}
+                {uploadStatus.isUploading && (
+                  <div className="mt-4">
+                    <UploadProgress
+                      progress={uploadStatus.progress}
+                      status={uploadStatus.status}
+                      fileName={uploadedImage?.file.name || ''}
+                    />
+                  </div>
+                )}
+                
+                {/* 错误信息显示 */}
+                {error && (
+                  <div className="mt-4">
+                    <ErrorMessage
+                      error={error}
+                      onRetry={error.retryable ? () => {
+                        setError(null);
+                        if (uploadedImage) {
+                          handleImageUpload(uploadedImage.file);
+                        }
+                      } : undefined}
+                      onDismiss={() => setError(null)}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -499,6 +768,14 @@ function App() {
         uploadedImage={uploadedImage}
         selectedModel={selectedModel}
         isRecognizing={isRecognizing}
+      />
+      
+      {/* 导出对话框 */}
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        items={exportItems}
+        title="导出识别结果"
       />
     </div>
   );

@@ -62,7 +62,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
     <div className="w-full">
       <div
         className={`
-          border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all duration-200
+          border-2 border-dashed rounded-lg p-4 md:p-8 text-center cursor-pointer transition-all duration-200
           ${dragOver 
             ? 'border-blue-400 bg-blue-50' 
             : 'border-blue-200 hover:border-blue-300 hover:bg-blue-25'
@@ -73,16 +73,17 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload }) => {
         onDragLeave={handleDragLeave}
         onClick={handleClick}
       >
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-            <Camera className="w-8 h-8 text-gray-400" />
+        <div className="flex flex-col items-center gap-2 md:gap-4">
+          <div className="w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center">
+            <Camera className="w-6 h-6 md:w-8 md:h-8 text-gray-400" />
           </div>
           
-          <div className="space-y-2">
-            <p className="text-lg font-medium text-gray-700">
-              点击上传图片或拖拽到此处
+          <div className="space-y-1 md:space-y-2">
+            <p className="text-base md:text-lg font-medium text-gray-700">
+              <span className="hidden sm:inline">点击上传图片或拖拽到此处</span>
+              <span className="sm:hidden">点击上传图片</span>
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs md:text-sm text-gray-500">
               支持 JPG、PNG、GIF、WebP 格式，最大 10MB
             </p>
           </div>
