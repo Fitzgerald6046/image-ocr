@@ -190,7 +190,7 @@ function App() {
       
       console.log('🚀 开始上传图片:', file.name);
       
-      const response = await fetch('http://localhost:3001/api/upload', {
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/upload`, {
         method: 'POST',
         body: formData
       });
@@ -206,7 +206,7 @@ function App() {
         const imageInfo = {
           file,
           fileId: result.file.id,
-          url: `http://localhost:3001${result.file.url}`,
+          url: `${window.location.protocol}//${window.location.hostname}:3001${result.file.url}`,
           metadata: result.file.metadata
         };
         
@@ -311,7 +311,7 @@ function App() {
       };
       console.log('请求数据:', requestData);
 
-      const response = await fetch('http://localhost:3001/api/recognition', {
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/recognition`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

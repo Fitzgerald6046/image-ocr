@@ -167,7 +167,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       console.log('🧪 测试连接:', provider);
       
       // 调用后端测试API
-      const response = await fetch('http://localhost:3001/api/models/test', {
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/models/test`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
