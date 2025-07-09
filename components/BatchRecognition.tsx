@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Play, Pause, RotateCcw, Download, Eye, Loader2 } from 'lucide-react';
 import { ErrorHandler, ApiError } from '../utils/errorHandler';
 import ErrorMessage from './ErrorMessage';
+import BatchResultModal from './BatchResultModal';
 
 interface BatchFileItem {
   id: string;
@@ -53,6 +54,8 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedResult, setSelectedResult] = useState<{ result: RecognitionResult; fileName: string } | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const recognizeFile = async (item: BatchRecognitionItem): Promise<BatchRecognitionItem> => {
     try {
@@ -223,6 +226,110 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
     setIsPaused(false);
   };
 
+  const handleViewResult = (item: BatchRecognitionItem) => {
+    if (item.recognitionResult) {
+      setSelectedResult({
+        result: item.recognitionResult,
+        fileName: item.file.name
+      });
+      setIsModalOpen(true);
+    }
+  };
+
+  const handleDownloadResult = (item: BatchRecognitionItem) => {
+    if (item.recognitionResult) {
+      // 生成文件名（移除原文件扩展名，添加时间戳）
+      const originalName = item.file.name.replace(/\.[^/.]+$/, '');
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      const fileName = `${originalName}_识别结果_${timestamp}.txt`;
+      
+      // 准备下载内容
+      const content = [
+        `=== 图像识别结果 ===`,
+        `文件名: ${item.file.name}`,
+        `识别类型: ${item.recognitionResult.type}`,
+        `置信度: ${(item.recognitionResult.confidence * 100).toFixed(1)}%`,
+        `使用模型: ${item.recognitionResult.model}`,
+        `提供商: ${item.recognitionResult.provider || 'N/A'}`,
+        `识别时间: ${item.recognitionResult.timestamp ? new Date(item.recognitionResult.timestamp).toLocaleString() : 'N/A'}`,
+        ``,
+        `=== 识别内容 ===`,
+        item.recognitionResult.content,
+        ``,
+        `=== 生成时间 ===`,
+        new Date().toLocaleString()
+      ].join('\n');
+      
+      // 创建并下载文件
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedResult(null);
+  };
+
+  const handleDownloadAllResults = () => {
+    const completedItems = recognitionItems.filter(item => 
+      item.recognitionStatus === 'completed' && item.recognitionResult
+    );
+    
+    if (completedItems.length === 0) {
+      alert('没有可下载的结果');
+      return;
+    }
+    
+    // 生成所有结果的综合文件
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const fileName = `批量识别结果_${timestamp}.txt`;
+    
+    const content = [
+      `=== 批量识别结果总结 ===`,
+      `生成时间: ${new Date().toLocaleString()}`,
+      `总文件数: ${recognitionItems.length}`,
+      `成功识别: ${completedItems.length}`,
+      `识别类型: ${recognitionType}`,
+      `使用模型: ${selectedModel}`,
+      ``,
+      `=== 识别结果明细 ===`,
+      ...completedItems.map((item, index) => [
+        ``,
+        `--- 第${index + 1}个文件 ---`,
+        `文件名: ${item.file.name}`,
+        `文件大小: ${(item.file.size / 1024).toFixed(1)} KB`,
+        `识别类型: ${item.recognitionResult!.type}`,
+        `置信度: ${(item.recognitionResult!.confidence * 100).toFixed(1)}%`,
+        `使用模型: ${item.recognitionResult!.model}`,
+        `识别时间: ${item.recognitionResult!.timestamp ? new Date(item.recognitionResult!.timestamp).toLocaleString() : 'N/A'}`,
+        ``,
+        `识别内容:`,
+        item.recognitionResult!.content,
+        ``,
+        `${'='.repeat(50)}`
+      ]).flat()
+    ].join('\n');
+    
+    // 创建并下载文件
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const getStatusIcon = (status: BatchRecognitionItem['recognitionStatus']) => {
     switch (status) {
       case 'pending':
@@ -253,6 +360,21 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
     }
   };
 
+  const getTypeDisplayName = (type: string) => {
+    const typeMap: Record<string, string> = {
+      'auto': '智能识别',
+      'ancient': '古籍文献',
+      'receipt': '票据识别',
+      'document': '文档识别',
+      'id': '证件识别',
+      'table': '表格识别',
+      'handwriting': '手写识别',
+      'prompt': 'AI绘图',
+      'translate': '翻译识别'
+    };
+    return typeMap[type] || type;
+  };
+
   const completedCount = recognitionItems.filter(item => item.recognitionStatus === 'completed').length;
   const errorCount = recognitionItems.filter(item => item.recognitionStatus === 'error').length;
   const totalCount = recognitionItems.length;
@@ -276,6 +398,18 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
         </div>
         
         <div className="flex items-center gap-2">
+          {/* 批量下载按钮 */}
+          {completedCount > 0 && (
+            <button
+              onClick={handleDownloadAllResults}
+              className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              title="下载所有结果"
+            >
+              <Download className="w-4 h-4" />
+              下载全部
+            </button>
+          )}
+          
           {!isProcessing ? (
             <button
               onClick={startBatchRecognition}
@@ -368,34 +502,48 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
                     {item.recognitionStatus === 'completed' && (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            // 查看详细结果的逻辑
-                            console.log('View result:', item.recognitionResult);
-                          }}
-                          className="p-1 text-blue-500 hover:text-blue-700 transition-colors"
+                          onClick={() => handleViewResult(item)}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
                           title="查看结果"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3 h-3" />
+                          查看
                         </button>
                         <button
-                          onClick={() => {
-                            // 下载结果的逻辑
-                            console.log('Download result:', item.recognitionResult);
-                          }}
-                          className="p-1 text-green-500 hover:text-green-700 transition-colors"
+                          onClick={() => handleDownloadResult(item)}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-green-600 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
                           title="下载结果"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-3 h-3" />
+                          下载
                         </button>
                       </div>
                     )}
                   </div>
                   
                   {item.recognitionResult && (
-                    <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                      <p className="line-clamp-2">
-                        {item.recognitionResult.content.substring(0, 100)}...
-                      </p>
+                    <div className="mt-2 p-3 bg-gray-50 rounded border">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                            {getTypeDisplayName(item.recognitionResult.type)}
+                          </span>
+                          <span>模型: {item.recognitionResult.model}</span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {item.recognitionResult.timestamp && 
+                            new Date(item.recognitionResult.timestamp).toLocaleString()
+                          }
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-700 leading-relaxed">
+                        <p className="line-clamp-3">
+                          {item.recognitionResult.content.length > 150 
+                            ? item.recognitionResult.content.substring(0, 150) + '...' 
+                            : item.recognitionResult.content
+                          }
+                        </p>
+                      </div>
                     </div>
                   )}
                   
@@ -412,6 +560,16 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
             </div>
           ))}
         </div>
+      )}
+      
+      {/* Result Modal */}
+      {selectedResult && (
+        <BatchResultModal
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+          result={selectedResult.result}
+          fileName={selectedResult.fileName}
+        />
       )}
     </div>
   );
