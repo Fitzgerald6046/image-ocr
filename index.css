@@ -22,4 +22,42 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+}
+
+/* 自定义滚动条样式 */
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 8px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+  
+  .scrollbar-thumb-gray-400::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+  }
+  
+  .scrollbar-thumb-gray-500::-webkit-scrollbar-thumb {
+    background: #6b7280;
+  }
+  
+  .scrollbar-track-gray-200::-webkit-scrollbar-track {
+    background: #e5e7eb;
+  }
+  
+  .scrollbar-track-gray-100::-webkit-scrollbar-track {
+    background: #f3f4f6;
+  }
 } 

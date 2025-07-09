@@ -528,7 +528,7 @@ const EnhancedRecognitionResult: React.FC<EnhancedRecognitionResultProps> = ({
             {csvData && csvData.preview && (
               <div className="bg-white rounded p-4 border">
                 <h4 className="font-medium text-gray-800 mb-3">数据预览</h4>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
                   <table className="min-w-full text-sm border-collapse border border-gray-300">
                     <thead>
                       <tr className="bg-gray-50">
@@ -637,7 +637,7 @@ const EnhancedRecognitionResult: React.FC<EnhancedRecognitionResultProps> = ({
                     复制翻译
                   </button>
                 </div>
-                <div className="bg-gray-50 p-3 rounded text-sm">
+                <div className="bg-gray-50 p-3 rounded text-sm max-h-48 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
                   {modernTranslation.fullTranslation}
                 </div>
               </div>
