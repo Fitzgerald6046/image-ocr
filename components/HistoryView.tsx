@@ -11,7 +11,8 @@ import {
   Tag,
   MoreHorizontal,
   ArrowLeft,
-  RefreshCw
+  RefreshCw,
+  Layers
 } from 'lucide-react';
 import { HistoryManager, HistoryItem, HistoryFilter } from '../utils/historyManager';
 
@@ -378,13 +379,17 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onBack, onViewResult }) => {
                   </p>
                 </div>
               ) : (
-                filteredHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    className={`bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow ${
-                      selectedItems.has(item.id) ? 'bg-blue-50 border-blue-300' : ''
-                    }`}
-                  >
+                filteredHistory.map((item) => {
+                  const isBatchProcessing = item.tags?.includes('批量处理');
+                  return (
+                    <div
+                      key={item.id}
+                      className={`bg-white rounded-lg p-4 border border-gray-200 hover:shadow-md transition-shadow ${
+                        selectedItems.has(item.id) ? 'bg-blue-50 border-blue-300' : ''
+                      } ${
+                        isBatchProcessing ? 'border-l-4 border-l-purple-500' : ''
+                      }`}
+                    >
                     <div className="flex items-start gap-4">
                       <input
                         type="checkbox"
@@ -395,9 +400,17 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onBack, onViewResult }) => {
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-lg font-medium text-gray-900 truncate">
-                            {item.fileName}
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            {isBatchProcessing && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                                <Layers className="w-3 h-3" />
+                                批量处理
+                              </div>
+                            )}
+                            <h4 className="text-lg font-medium text-gray-900 truncate">
+                              {item.fileName}
+                            </h4>
+                          </div>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => toggleFavorite(item.id)}
@@ -461,7 +474,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onBack, onViewResult }) => {
                       </div>
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

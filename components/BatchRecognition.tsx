@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, Download, Eye, Loader2 } from 'lucide-react';
 import { ErrorHandler, ApiError } from '../utils/errorHandler';
 import ErrorMessage from './ErrorMessage';
 import BatchResultModal from './BatchResultModal';
+import { HistoryManager } from '../utils/historyManager';
 
 interface BatchFileItem {
   id: string;
@@ -187,6 +188,31 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
         // 处理识别
         const result = await recognizeFile(item);
         results.push(result);
+        
+        // 如果识别成功，保存到历史记录
+        if (result.recognitionStatus === 'completed' && result.recognitionResult) {
+          try {
+            HistoryManager.saveRecord({
+              fileName: result.file.name,
+              fileSize: result.file.size,
+              fileType: result.file.type,
+              recognitionType: result.recognitionResult.type,
+              model: result.recognitionResult.model,
+              provider: result.recognitionResult.provider || 'unknown',
+              result: {
+                content: result.recognitionResult.content,
+                confidence: result.recognitionResult.confidence,
+                originalContent: result.recognitionResult.originalContent,
+                classification: result.recognitionResult.classification,
+                specialAnalysis: result.recognitionResult.specialAnalysis
+              },
+              previewUrl: result.url,
+              tags: ['批量处理']
+            });
+          } catch (error) {
+            console.error('Failed to save batch recognition result to history:', error);
+          }
+        }
         
         // 更新结果
         setRecognitionItems(prev => prev.map(r => 

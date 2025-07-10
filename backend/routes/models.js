@@ -215,4 +215,195 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// 获取提供商的最新模型列表
+router.post('/list', async (req, res) => {
+  try {
+    const { providerId, apiKey, apiUrl } = req.body;
+
+    if (!providerId || !apiKey || !apiUrl) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供完整的提供商信息'
+      });
+    }
+
+    console.log(`🔄 获取 ${providerId} 的模型列表`);
+
+    // 根据不同提供商调用相应的API获取模型列表
+    let models = [];
+    
+    switch (providerId) {
+      case 'openai':
+        models = await getOpenAIModels(apiKey, apiUrl);
+        break;
+      case 'gemini':
+        models = await getGeminiModels(apiKey, apiUrl);
+        break;
+      case 'deepseek':
+        models = await getDeepSeekModels(apiKey, apiUrl);
+        break;
+      case 'claude':
+        models = await getClaudeModels(apiKey, apiUrl);
+        break;
+      case 'openrouter':
+        models = await getOpenRouterModels(apiKey, apiUrl);
+        break;
+      case 'hunyuan':
+        models = await getHunyuanModels(apiKey, apiUrl);
+        break;
+      case 'zhipuai':
+        models = await getZhipuAIModels(apiKey, apiUrl);
+        break;
+      case 'tongyi':
+        models = await getTongyiModels(apiKey, apiUrl);
+        break;
+      case 'paddleocr':
+        models = await getPaddleOCRModels(apiKey, apiUrl);
+        break;
+      default:
+        models = await getGenericModels(apiKey, apiUrl);
+    }
+
+    res.json({
+      success: true,
+      models,
+      provider: providerId,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Get models list error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || '获取模型列表失败'
+    });
+  }
+});
+
+// 各个提供商的模型获取函数
+async function getOpenAIModels(apiKey, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.data?.map(model => model.id) || [];
+  } catch (error) {
+    console.error('OpenAI模型获取失败:', error);
+    return ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']; // 默认模型
+  }
+}
+
+async function getGeminiModels(apiKey, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/models?key=${apiKey}`);
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.models?.map(model => model.name.replace('models/', '')) || [];
+  } catch (error) {
+    console.error('Gemini模型获取失败:', error);
+    return ['gemini-2.5-pro-preview-03-25', 'gemini-2.5-flash-preview-04-17-thinking']; // 默认模型
+  }
+}
+
+async function getDeepSeekModels(apiKey, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.data?.map(model => model.id) || [];
+  } catch (error) {
+    console.error('DeepSeek模型获取失败:', error);
+    return ['deepseek-chat', 'deepseek-vl-chat']; // 默认模型
+  }
+}
+
+async function getClaudeModels(apiKey, apiUrl) {
+  // Claude API 目前不提供模型列表接口，返回已知模型
+  return ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
+}
+
+async function getOpenRouterModels(apiKey, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.data?.map(model => model.id) || [];
+  } catch (error) {
+    console.error('OpenRouter模型获取失败:', error);
+    return ['google/gemini-2.5-pro-exp-03-25:free', 'google/gemini-2.5-flash-preview-04-17-thinking:free']; // 默认模型
+  }
+}
+
+async function getHunyuanModels(apiKey, apiUrl) {
+  // 腾讯混元目前返回已知模型
+  return ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro'];
+}
+
+async function getZhipuAIModels(apiKey, apiUrl) {
+  // 智谱清言目前返回已知模型
+  return ['glm-4-flash', 'glm-4-plus', 'glm-4v-plus', 'glm-4-air'];
+}
+
+async function getTongyiModels(apiKey, apiUrl) {
+  // 通义千问目前返回已知模型
+  return ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-vl-plus', 'qwen-vl-max'];
+}
+
+async function getPaddleOCRModels(apiKey, apiUrl) {
+  // PaddleOCR目前返回已知模型
+  return ['general_basic', 'accurate_basic', 'general', 'accurate', 'handwriting'];
+}
+
+async function getGenericModels(apiKey, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.data?.map(model => model.id) || data.models || [];
+  } catch (error) {
+    console.error('通用模型获取失败:', error);
+    return ['default-model']; // 默认模型
+  }
+}
+
 export default router; 

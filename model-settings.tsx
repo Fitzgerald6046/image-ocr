@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Settings, Plus, Trash2, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
 
 interface ModelSettingsProps {
   onBack?: () => void;
@@ -73,6 +73,61 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       customModels: [],
       expanded: false,
       testStatus: null
+    },
+    {
+      id: 'hunyuan',
+      name: '腾讯混元',
+      icon: '🐧',
+      apiKey: '',
+      apiUrl: 'https://hunyuan.tencentcloudapi.com',
+      models: ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro'],
+      customModels: [],
+      expanded: false,
+      testStatus: null
+    },
+    {
+      id: 'zhipuai',
+      name: '智谱清言',
+      icon: '🧩',
+      apiKey: '',
+      apiUrl: 'https://open.bigmodel.cn/api/paas/v4',
+      models: ['glm-4-flash', 'glm-4-plus', 'glm-4v-plus', 'glm-4-air'],
+      customModels: [],
+      expanded: false,
+      testStatus: null
+    },
+    {
+      id: 'tongyi',
+      name: '阿里云通义千问',
+      icon: '🌤️',
+      apiKey: '',
+      apiUrl: 'https://dashscope.aliyuncs.com/api/v1',
+      models: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-vl-plus', 'qwen-vl-max'],
+      customModels: [],
+      expanded: false,
+      testStatus: null
+    },
+    {
+      id: 'paddleocr',
+      name: 'PaddleOCR (百度)',
+      icon: '🔍',
+      apiKey: '',
+      apiUrl: 'https://aip.baidubce.com/rest/2.0/ocr/v1',
+      models: ['general_basic', 'accurate_basic', 'general', 'accurate', 'handwriting'],
+      customModels: [],
+      expanded: false,
+      testStatus: null
+    },
+    {
+      id: 'claude',
+      name: 'Claude',
+      icon: '🤖',
+      apiKey: '',
+      apiUrl: 'https://api.anthropic.com/v1',
+      models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
+      customModels: [],
+      expanded: false,
+      testStatus: null
     }
   ]);
 
@@ -86,6 +141,9 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
   });
   const [newModel, setNewModel] = useState('');
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
+  const [testingModel, setTestingModel] = useState<string | null>(null);
+  const [showModelSelector, setShowModelSelector] = useState<string | null>(null);
+  const [updatingModels, setUpdatingModels] = useState<string | null>(null);
 
   // 从localStorage加载配置
   useEffect(() => {
@@ -136,7 +194,16 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
   };
 
   const addCustomModel = (providerId: string, modelName: string) => {
-    if (!modelName.trim()) return;
+    if (!modelName.trim()) {
+      alert('请输入模型名称');
+      return;
+    }
+    
+    const provider = providers.find(p => p.id === providerId);
+    if (provider && provider.customModels.includes(modelName.trim())) {
+      alert('模型名称已存在');
+      return;
+    }
     
     setProviders(prev => prev.map(p => 
       p.id === providerId 
@@ -153,7 +220,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
     ));
   };
 
-  const testConnection = async (providerId: string) => {
+  const testConnection = async (providerId: string, selectedModel?: string) => {
     setTestingProvider(providerId);
     const provider = providers.find(p => p.id === providerId);
     
@@ -163,8 +230,19 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       return;
     }
     
+    const availableModels = [...provider.models, ...provider.customModels];
+    const modelToTest = selectedModel || availableModels[0] || `${provider.id}-test`;
+    
+    if (!selectedModel && availableModels.length > 1) {
+      setShowModelSelector(providerId);
+      setTestingProvider(null);
+      return;
+    }
+    
+    setTestingModel(modelToTest);
+    
     try {
-      console.log('🧪 测试连接:', provider);
+      console.log('🧪 测试连接:', provider, '模型:', modelToTest);
       
       // 调用后端测试API
       const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/models/test`, {
@@ -174,7 +252,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
         },
         body: JSON.stringify({
           modelConfig: {
-            model: provider.models[0] || `${provider.id}-test`,
+            model: modelToTest,
             apiKey: provider.apiKey,
             apiUrl: provider.apiUrl
           }
@@ -191,9 +269,9 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       ));
       
       if (!result.success) {
-        alert(`连接测试失败: ${result.message}`);
+        alert(`连接测试失败 (${modelToTest}): ${result.message}`);
       } else {
-        alert('连接测试成功！');
+        alert(`连接测试成功！(${modelToTest})`);
       }
       
     } catch (error) {
@@ -204,10 +282,48 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
           : p
       ));
       const errorMessage = error instanceof Error ? error.message : '未知错误';
-      alert(`连接测试失败: ${errorMessage}`);
+      alert(`连接测试失败 (${modelToTest}): ${errorMessage}`);
     } finally {
       setTestingProvider(null);
+      setTestingModel(null);
     }
+  };
+  
+  const ModelSelector: React.FC<{ providerId: string; onSelect: (model: string) => void; onClose: () => void }> = ({ providerId, onSelect, onClose }) => {
+    const provider = providers.find(p => p.id === providerId);
+    if (!provider) return null;
+    
+    const availableModels = [...provider.models, ...provider.customModels];
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 w-96 max-w-90vw">
+          <h3 className="text-lg font-semibold mb-4">选择要测试的模型</h3>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {availableModels.map((model) => (
+              <button
+                key={model}
+                onClick={() => {
+                  onSelect(model);
+                  onClose();
+                }}
+                className="w-full text-left px-3 py-2 rounded hover:bg-gray-100 border border-gray-200"
+              >
+                {model}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const addCustomProvider = () => {
@@ -231,7 +347,59 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
   };
 
   const removeProvider = (providerId: string) => {
-    setProviders(prev => prev.filter(p => p.id !== providerId));
+    if (confirm('确定要删除这个提供商吗？')) {
+      setProviders(prev => prev.filter(p => p.id !== providerId));
+    }
+  };
+
+  const updateAvailableModels = async (providerId: string) => {
+    setUpdatingModels(providerId);
+    const provider = providers.find(p => p.id === providerId);
+    
+    if (!provider || !provider.apiKey || !provider.apiUrl) {
+      alert('请先填写API密钥和API地址');
+      setUpdatingModels(null);
+      return;
+    }
+    
+    try {
+      console.log('🔄 更新可用模型:', provider);
+      
+      // 调用后端API获取模型列表
+      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/models/list`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          providerId: provider.id,
+          apiKey: provider.apiKey,
+          apiUrl: provider.apiUrl
+        })
+      });
+      
+      const result = await response.json();
+      console.log('📋 模型列表结果:', result);
+      
+      if (result.success && result.models) {
+        // 更新模型列表，保留现有自定义模型
+        setProviders(prev => prev.map(p => 
+          p.id === providerId 
+            ? { ...p, models: result.models }
+            : p
+        ));
+        alert(`成功更新模型列表！发现 ${result.models.length} 个模型`);
+      } else {
+        alert(`获取模型列表失败: ${result.message || '未知错误'}`);
+      }
+      
+    } catch (error) {
+      console.error('❌ 更新模型列表失败:', error);
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      alert(`更新模型列表失败: ${errorMessage}`);
+    } finally {
+      setUpdatingModels(null);
+    }
   };
 
   const TestStatusIcon: React.FC<{ status: 'success' | 'error' | null; isLoading: boolean }> = ({ status, isLoading }) => {
@@ -294,14 +462,38 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
                       disabled={testingProvider === provider.id}
                       className="px-3 py-1 text-sm border border-blue-200 text-blue-600 rounded hover:bg-blue-50 disabled:opacity-50"
                     >
-                      {testingProvider === provider.id ? '测试中...' : '测试连接'}
+                      {testingProvider === provider.id ? 
+                        (testingModel ? `测试中 (${testingModel})...` : '测试中...') : 
+                        '测试连接'
+                      }
                     </button>
-                    <button 
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-1 text-gray-400 hover:text-gray-600"
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateAvailableModels(provider.id);
+                      }}
+                      disabled={updatingModels === provider.id}
+                      className="px-3 py-1 text-sm border border-green-200 text-green-600 rounded hover:bg-green-50 disabled:opacity-50"
+                      title="更新模型列表"
                     >
-                      <Settings className="w-4 h-4" />
+                      {updatingModels === provider.id ? (
+                        <Loader className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
                     </button>
+                    {provider.id.startsWith('custom') && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeProvider(provider.id);
+                        }}
+                        className="p-1 text-red-400 hover:text-red-600"
+                        title="删除提供商"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -341,6 +533,11 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
                           {provider.id === 'openrouter' && 'OpenRouter提供多种免费AI模型，包括免费的Gemini 2.5 Pro。请在 openrouter.ai 注册获取免费API密钥'}
                           {provider.id === 'deepseek' && '对于自定义DeepSeek端点，请提供完整的API地址，如 https://your-domain.com/v1'}
                           {provider.id === 'openai' && '对于自定义OpenAI端点，请提供完整的API地址，如 https://your-domain.com/v1'}
+                          {provider.id === 'hunyuan' && '腾讯混元大模型API。请在腾讯云控制台获取API密钥'}
+                          {provider.id === 'zhipuai' && '智谱清言API。请在 open.bigmodel.cn 注册获取API密钥'}
+                          {provider.id === 'tongyi' && '阿里云通义千问API。请在阿里云控制台获取API密钥'}
+                          {provider.id === 'paddleocr' && '百度PaddleOCR API。请在百度AI开放平台获取API密钥'}
+                          {provider.id === 'claude' && 'Anthropic Claude API。请在 console.anthropic.com 获取API密钥'}
                           {provider.id.startsWith('custom') && '请提供完整的API测试地址，如 https://your-api.com/v1/models'}
                         </p>
                       </div>
@@ -485,6 +682,15 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
           )}
         </div>
       </div>
+      
+      {/* 模型选择器弹窗 */}
+      {showModelSelector && (
+        <ModelSelector
+          providerId={showModelSelector}
+          onSelect={(model) => testConnection(showModelSelector, model)}
+          onClose={() => setShowModelSelector(null)}
+        />
+      )}
     </div>
   );
 };

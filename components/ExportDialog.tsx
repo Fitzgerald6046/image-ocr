@@ -225,6 +225,14 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
                   <Download className="w-4 h-4" />
                   {isExporting ? '导出中...' : '导出所有格式'}
                 </button>
+                
+                <button
+                  onClick={onClose}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors mt-2"
+                >
+                  <X className="w-4 h-4" />
+                  取消
+                </button>
               </div>
             </div>
           </div>
@@ -232,18 +240,32 @@ const ExportDialog: React.FC<ExportDialogProps> = ({
           {/* 右侧：预览区域 */}
           <div className="w-1/2 flex flex-col">
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-900">导出预览</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                {showPreview ? `${selectedFormat.toUpperCase()} 格式预览` : '点击预览按钮查看导出格式'}
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900">导出预览</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {showPreview ? `${selectedFormat.toUpperCase()} 格式预览` : '点击预览按钮查看导出格式'}
+                  </p>
+                </div>
+                {showPreview && (
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    取消预览
+                  </button>
+                )}
+              </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6">
               {showPreview ? (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
-                    {preview}
-                  </pre>
+                <div className="bg-gray-50 rounded-lg p-4 min-h-full">
+                  <div className="max-h-full overflow-y-auto">
+                    <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono break-words">
+                      {preview}
+                    </pre>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
