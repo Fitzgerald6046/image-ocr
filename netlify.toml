@@ -1,0 +1,117 @@
+[build]
+  # 构建命令
+  command = "npm run build"
+  
+  # 构建产物目录
+  publish = "dist"
+  
+  # 忽略的文件
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF backend/"
+
+[build.environment]
+  # Node.js 版本
+  NODE_VERSION = "18.17.0"
+  
+  # 构建环境变量
+  NODE_ENV = "production"
+  
+  # 启用ES6 modules
+  NODE_OPTIONS = "--openssl-legacy-provider"
+
+# Functions 配置
+[functions]
+  directory = "netlify/functions"
+  
+  # 设置函数超时时间（秒）
+  timeout = 30
+  
+  # 允许的外部网络请求
+  external_node_modules = [
+    "axios",
+    "uuid",
+    "formidable",
+    "cloudinary"
+  ]
+
+# 重定向规则
+[[redirects]]
+  from = "/api/upload"
+  to = "/.netlify/functions/upload"
+  status = 200
+
+[[redirects]]
+  from = "/api/recognition"
+  to = "/.netlify/functions/recognition"
+  status = 200
+
+[[redirects]]
+  from = "/api/recognition/*"
+  to = "/.netlify/functions/recognition"
+  status = 200
+
+[[redirects]]
+  from = "/api/models"
+  to = "/.netlify/functions/models"
+  status = 200
+
+[[redirects]]
+  from = "/api/models/*"
+  to = "/.netlify/functions/models"
+  status = 200
+
+# SPA 路由处理
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 头部设置
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"
+
+# 环境变量（在Netlify控制面板中设置）
+# CLOUDINARY_CLOUD_NAME = "your-cloudinary-cloud-name"
+# CLOUDINARY_API_KEY = "your-cloudinary-api-key"
+# CLOUDINARY_API_SECRET = "your-cloudinary-api-secret"
+
+# 缓存设置
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# 预渲染设置（可选）
+# [build.processing]
+#   skip_processing = false
+# [build.processing.css]
+#   bundle = true
+#   minify = true
+# [build.processing.js]
+#   bundle = true
+#   minify = true
+# [build.processing.html]
+#   pretty_urls = true
+# [build.processing.images]
+#   compress = true
