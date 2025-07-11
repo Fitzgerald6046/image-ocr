@@ -5,12 +5,12 @@
   # 构建产物目录
   publish = "dist"
   
-  # 忽略的文件
-  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF backend/"
+  # 忽略的文件（注释掉，因为这会导致所有提交都被忽略）
+  # ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF backend/"
 
 [build.environment]
   # Node.js 版本
-  NODE_VERSION = "18.17.0"
+  NODE_VERSION = "18"
   
   # 构建环境变量
   NODE_ENV = "production"
@@ -22,9 +22,6 @@
 [functions]
   directory = "netlify/functions"
   
-  # 设置函数超时时间（秒）
-  timeout = 30
-  
   # 允许的外部网络请求
   external_node_modules = [
     "axios",
@@ -32,6 +29,10 @@
     "formidable",
     "cloudinary"
   ]
+
+# 函数超时设置
+[functions."*"]
+  timeout = 30
 
 # 重定向规则
 [[redirects]]
