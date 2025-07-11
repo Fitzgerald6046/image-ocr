@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "uuid": "^9.0.0",
-    "cloudinary": "^1.41.0"
+    "cloudinary": "^1.41.0",
+    "axios": "^1.6.0"
   }
 }

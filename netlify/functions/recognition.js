@@ -160,9 +160,10 @@ async function recognizeWithGemini(imageUrl, modelConfig, prompt) {
   const result = response.data.candidates[0].content.parts[0].text;
   
   return {
-    text: result,
+    content: result,
     confidence: 0.95, // Gemini通常有较高的置信度
     model: model,
+    provider: 'gemini',
     timestamp: new Date().toISOString()
   };
 }
@@ -199,9 +200,10 @@ async function recognizeWithOpenAI(imageUrl, modelConfig, prompt) {
   const result = response.data.choices[0].message.content;
   
   return {
-    text: result,
+    content: result,
     confidence: 0.92,
     model: model,
+    provider: 'openai',
     timestamp: new Date().toISOString()
   };
 }
@@ -237,9 +239,10 @@ async function recognizeWithDeepSeek(imageUrl, modelConfig, prompt) {
   const result = response.data.choices[0].message.content;
   
   return {
-    text: result,
+    content: result,
     confidence: 0.90,
     model: model,
+    provider: 'deepseek',
     timestamp: new Date().toISOString()
   };
 }
@@ -287,9 +290,10 @@ async function recognizeWithClaude(imageUrl, modelConfig, prompt) {
   const result = response.data.content[0].text;
   
   return {
-    text: result,
+    content: result,
     confidence: 0.93,
     model: model,
+    provider: 'claude',
     timestamp: new Date().toISOString()
   };
 }
@@ -326,9 +330,10 @@ async function recognizeWithGeneric(imageUrl, modelConfig, prompt) {
   const result = response.data.choices[0].message.content;
   
   return {
-    text: result,
+    content: result,
     confidence: 0.85,
     model: model,
+    provider: 'generic',
     timestamp: new Date().toISOString()
   };
 }

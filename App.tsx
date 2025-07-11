@@ -421,6 +421,7 @@ function App() {
       console.log('🚀 发送识别请求...');
       const requestData = {
         fileId: uploadedImage.fileId,
+        imageUrl: uploadedImage.url,
         modelConfig,
         recognitionType
       };
