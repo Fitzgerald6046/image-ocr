@@ -4,9 +4,7 @@
   "description": "Netlify Functions for OCR API",
   "type": "module",
   "dependencies": {
-    "axios": "^1.6.0",
     "uuid": "^9.0.0",
-    "formidable": "^3.5.1",
     "cloudinary": "^1.41.0"
   }
 }
