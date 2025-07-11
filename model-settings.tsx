@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Plus, Trash2, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { getApiUrl, API_CONFIG } from './src/config';
 
 interface ModelSettingsProps {
   onBack?: () => void;
@@ -245,7 +246,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       console.log('🧪 测试连接:', provider, '模型:', modelToTest);
       
       // 调用后端测试API
-      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/models/test`, {
+      const response = await fetch(getApiUrl(`${API_CONFIG.endpoints.models}/test`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -366,7 +367,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       console.log('🔄 更新可用模型:', provider);
       
       // 调用后端API获取模型列表
-      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/models/list`, {
+      const response = await fetch(getApiUrl(`${API_CONFIG.endpoints.models}/list`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

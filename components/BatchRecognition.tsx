@@ -4,6 +4,7 @@ import { ErrorHandler, ApiError } from '../utils/errorHandler';
 import ErrorMessage from './ErrorMessage';
 import BatchResultModal from './BatchResultModal';
 import { HistoryManager } from '../utils/historyManager';
+import { getApiUrl, API_CONFIG } from '../src/config';
 
 interface BatchFileItem {
   id: string;
@@ -96,7 +97,7 @@ const BatchRecognition: React.FC<BatchRecognitionProps> = ({
         recognitionType
       };
 
-      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/recognition`, {
+      const response = await fetch(getApiUrl(API_CONFIG.endpoints.recognition), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

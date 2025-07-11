@@ -4,6 +4,7 @@ import { FileHandler } from '../utils/fileHandler';
 import { ErrorHandler, ApiError } from '../utils/errorHandler';
 import UploadProgress from './UploadProgress';
 import ErrorMessage from './ErrorMessage';
+import { getApiUrl, API_CONFIG } from '../src/config';
 
 interface BatchFileItem {
   id: string;
@@ -133,7 +134,7 @@ const BatchUpload: React.FC<BatchUploadProps> = ({
           : f
       ));
 
-      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/upload`, {
+      const response = await fetch(getApiUrl(API_CONFIG.endpoints.upload), {
         method: 'POST',
         body: formData
       });
@@ -151,7 +152,7 @@ const BatchUpload: React.FC<BatchUploadProps> = ({
           status: 'completed',
           progress: 100,
           fileId: result.file.id,
-          url: `${window.location.protocol}//${window.location.hostname}:3001${result.file.url}`
+          url: result.file.url.startsWith('http') ? result.file.url : `${API_CONFIG.baseURL}${result.file.url}`
         };
       } else {
         throw new Error(result.message || '上传失败');

@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, Download, Eye, Loader2, Clock, Award, TrendingU
 import { ErrorHandler, ApiError } from '../utils/errorHandler';
 import ErrorMessage from './ErrorMessage';
 import MultiModelSelector from './MultiModelSelector';
+import { getApiUrl, API_CONFIG } from '../src/config';
 
 interface ModelComparisonProps {
   uploadedImage: {
@@ -118,7 +119,7 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
 
       console.log(`🚀 开始使用 ${modelName} 进行识别`);
 
-      const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/recognition`, {
+      const response = await fetch(getApiUrl(API_CONFIG.endpoints.recognition), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
