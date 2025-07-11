@@ -26,7 +26,6 @@
   external_node_modules = [
     "axios",
     "uuid",
-    "formidable",
     "cloudinary"
   ]
 
@@ -42,7 +41,12 @@
 
 [[redirects]]
   from = "/api/recognition"
-  to = "/.netlify/functions/recognition"
+  to = "/.netlify/functions/recognition-simple"
+  status = 200
+
+[[redirects]]
+  from = "/api/test"
+  to = "/.netlify/functions/test-api"
   status = 200
 
 [[redirects]]
