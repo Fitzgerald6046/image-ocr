@@ -17,14 +17,30 @@ export const handler = async (event, context) => {
     };
   }
 
-  // Only allow POST requests
+  // Handle GET requests for status
+  if (event.httpMethod === 'GET') {
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({
+        success: true,
+        message: 'Recognition API is working',
+        timestamp: new Date().toISOString(),
+        supportedMethods: ['POST'],
+        usage: 'Send POST request with fileId/imageUrl and modelConfig'
+      })
+    };
+  }
+
+  // Only allow POST requests for recognition
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
       headers,
       body: JSON.stringify({ 
         error: 'Method not allowed',
-        method: event.httpMethod 
+        method: event.httpMethod,
+        supportedMethods: ['GET', 'POST']
       })
     };
   }
