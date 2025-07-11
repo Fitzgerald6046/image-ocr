@@ -41,7 +41,12 @@
 
 [[redirects]]
   from = "/api/recognition"
-  to = "/.netlify/functions/recognition-minimal"
+  to = "/.netlify/functions/recognition-proxy"
+  status = 200
+
+[[redirects]]
+  from = "/api/ai-proxy"
+  to = "/.netlify/functions/ai-proxy"
   status = 200
 
 [[redirects]]
