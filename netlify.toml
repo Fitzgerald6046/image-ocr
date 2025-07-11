@@ -41,12 +41,17 @@
 
 [[redirects]]
   from = "/api/recognition"
-  to = "/.netlify/functions/recognition-stable"
+  to = "/.netlify/functions/recognition-minimal"
   status = 200
 
 [[redirects]]
   from = "/api/test"
   to = "/.netlify/functions/test-api"
+  status = 200
+
+[[redirects]]
+  from = "/api/debug"
+  to = "/.netlify/functions/debug"
   status = 200
 
 [[redirects]]
