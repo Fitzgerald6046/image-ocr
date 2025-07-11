@@ -98,24 +98,48 @@ export const handler = async (event, context) => {
 
     console.log('All validations passed');
 
-    // Return a mock success response for testing
-    const mockResult = {
-      content: `这是一个测试识别结果。识别类型: ${recognitionType}, 模型: ${modelConfig.model}, 图片URL: ${imageUrl || 'N/A'}`,
-      confidence: 0.95,
-      model: modelConfig.model,
-      provider: modelConfig.provider || 'test',
-      type: recognitionType,
-      timestamp: new Date().toISOString()
-    };
+    // Try to call the real AI API
+    console.log('Attempting real AI recognition...');
+    
+    let recognitionResult;
+    try {
+      recognitionResult = await callRealAI(imageUrl, modelConfig, recognitionType);
+      console.log('Real AI call successful:', recognitionResult);
+    } catch (aiError) {
+      console.error('Real AI call failed:', aiError);
+      
+      // Return detailed error info instead of mock result
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({
+          success: false,
+          error: 'AI recognition failed',
+          message: aiError.message,
+          details: {
+            modelConfig: {
+              model: modelConfig.model,
+              provider: modelConfig.provider,
+              hasApiKey: !!modelConfig.apiKey,
+              hasApiUrl: !!modelConfig.apiUrl
+            },
+            imageUrl: imageUrl ? 'present' : 'missing',
+            errorType: aiError.name,
+            errorStack: aiError.stack
+          },
+          timestamp: new Date().toISOString()
+        })
+      };
+    }
 
-    console.log('Returning mock result:', mockResult);
+    console.log('Returning real result:', recognitionResult);
 
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        recognition: mockResult,
+        recognition: recognitionResult,
         file: {
           id: fileId,
           url: imageUrl
@@ -123,7 +147,8 @@ export const handler = async (event, context) => {
         debug: {
           timestamp: new Date().toISOString(),
           requestReceived: true,
-          validationPassed: true
+          validationPassed: true,
+          aiCallSuccessful: true
         }
       })
     };
@@ -145,3 +170,172 @@ export const handler = async (event, context) => {
     };
   }
 };
+
+// Real AI calling function
+async function callRealAI(imageUrl, modelConfig, recognitionType) {
+  console.log('callRealAI called with:', { imageUrl, modelConfig, recognitionType });
+  
+  const prompts = {
+    auto: "请分析这张图片，自动识别其类型并提取相关信息。",
+    ancient: "请识别这张古籍中的文字内容。",
+    receipt: "请识别这张收据中的关键信息，包括商家、金额、日期等。",
+    document: "请识别这张文档中的所有文字内容。",
+    id: "请识别这张证件中的关键信息。",
+    table: "请识别这张表格中的数据。",
+    handwriting: "请识别这张手写文字。",
+    prompt: "请为这张图片生成AI绘图提示词。"
+  };
+
+  const prompt = prompts[recognitionType] || prompts.auto;
+  console.log('Using prompt:', prompt);
+  
+  try {
+    if (modelConfig.model.includes('gemini')) {
+      console.log('Calling Gemini API...');
+      return await callGeminiAPI(imageUrl, prompt, modelConfig);
+    } else if (modelConfig.model.includes('gpt') || modelConfig.model.includes('openai')) {
+      console.log('Calling OpenAI API...');
+      return await callOpenAIAPI(imageUrl, prompt, modelConfig);
+    } else {
+      console.log('Calling Generic API...');
+      return await callGenericAPI(imageUrl, prompt, modelConfig);
+    }
+  } catch (error) {
+    console.error('AI API call error:', error);
+    throw error;
+  }
+}
+
+// Gemini API call
+async function callGeminiAPI(imageUrl, prompt, modelConfig) {
+  console.log('callGeminiAPI started');
+  
+  try {
+    // Download image and convert to base64
+    console.log('Downloading image from:', imageUrl);
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+    }
+    
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+    console.log('Image converted to base64, length:', imageBase64.length);
+
+    const requestBody = {
+      contents: [{
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: imageBase64
+            }
+          }
+        ]
+      }]
+    };
+
+    const apiUrl = `${modelConfig.apiUrl}/models/${modelConfig.model}:generateContent?key=${modelConfig.apiKey}`;
+    console.log('Calling Gemini API at:', apiUrl);
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    console.log('Gemini API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini API error response:', errorText);
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Gemini API result:', JSON.stringify(result, null, 2));
+    
+    if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+      const content = result.candidates[0].content.parts[0].text;
+      return {
+        content: content,
+        confidence: 0.95,
+        model: modelConfig.model,
+        provider: 'gemini',
+        timestamp: new Date().toISOString()
+      };
+    }
+    
+    throw new Error('Invalid response structure from Gemini API');
+  } catch (error) {
+    console.error('Gemini API error:', error);
+    throw error;
+  }
+}
+
+// OpenAI compatible API call
+async function callOpenAIAPI(imageUrl, prompt, modelConfig) {
+  console.log('callOpenAIAPI started');
+  
+  try {
+    const requestBody = {
+      model: modelConfig.model,
+      messages: [{
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageUrl } }
+        ]
+      }],
+      max_tokens: 2000
+    };
+
+    const apiUrl = `${modelConfig.apiUrl}/chat/completions`;
+    console.log('Calling OpenAI API at:', apiUrl);
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${modelConfig.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    console.log('OpenAI API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error response:', errorText);
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('OpenAI API result:', JSON.stringify(result, null, 2));
+    
+    if (result.choices && result.choices[0] && result.choices[0].message) {
+      const content = result.choices[0].message.content;
+      return {
+        content: content,
+        confidence: 0.92,
+        model: modelConfig.model,
+        provider: 'openai',
+        timestamp: new Date().toISOString()
+      };
+    }
+    
+    throw new Error('Invalid response structure from OpenAI API');
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    throw error;
+  }
+}
+
+// Generic API call
+async function callGenericAPI(imageUrl, prompt, modelConfig) {
+  console.log('callGenericAPI started');
+  return await callOpenAIAPI(imageUrl, prompt, modelConfig); // Use OpenAI format as fallback
+}

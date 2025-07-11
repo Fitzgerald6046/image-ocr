@@ -41,7 +41,7 @@
 
 [[redirects]]
   from = "/api/recognition"
-  to = "/.netlify/functions/recognition-stable"
+  to = "/.netlify/functions/recognition-minimal"
   status = 200
 
 [[redirects]]
