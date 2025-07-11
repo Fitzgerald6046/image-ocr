@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { v2 as cloudinary } from 'cloudinary';
 
-// 配置Cloudinary（需要在Netlify环境变量中设置）
+// 配置Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -9,7 +9,6 @@ cloudinary.config({
 });
 
 export const handler = async (event, context) => {
-  // 设置CORS头
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -41,156 +40,146 @@ export const handler = async (event, context) => {
         headers,
         body: JSON.stringify({
           error: 'Server configuration error',
-          message: 'Cloudinary配置缺失，请在Netlify环境变量中配置CLOUDINARY_*'
+          message: 'Cloudinary配置缺失'
         })
       };
     }
 
-    // 创建一个临时的可读流来处理multipart数据
-    const boundary = event.headers['content-type']?.split('boundary=')[1];
-    if (!boundary) {
+    // 检查content-type
+    const contentType = event.headers['content-type'] || event.headers['Content-Type'];
+    if (!contentType?.includes('multipart/form-data')) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
           error: 'Invalid content type',
+          message: '需要multipart/form-data格式'
+        })
+      };
+    }
+
+    // 简化的multipart处理
+    const boundary = contentType.split('boundary=')[1];
+    if (!boundary) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({
+          error: 'Missing boundary',
           message: '缺少multipart boundary'
         })
       };
     }
 
-    // 解析multipart数据
-    const body = event.isBase64Encoded 
-      ? Buffer.from(event.body, 'base64') 
-      : Buffer.from(event.body);
+    // 处理body数据
+    let bodyBuffer;
+    if (event.isBase64Encoded) {
+      bodyBuffer = Buffer.from(event.body, 'base64');
+    } else {
+      bodyBuffer = Buffer.from(event.body, 'utf8');
+    }
 
-    // 使用简单的multipart解析
-    const parts = parseMultipart(body, boundary);
-    const imagePart = parts.find(part => part.name === 'image');
+    // 使用简单的字符串匹配来提取文件数据
+    const bodyString = bodyBuffer.toString('binary');
+    const parts = bodyString.split(`--${boundary}`);
+    
+    let imageData = null;
+    let filename = 'upload';
+    
+    for (const part of parts) {
+      if (part.includes('Content-Disposition: form-data') && part.includes('name="image"')) {
+        const lines = part.split('\r\n');
+        const dispositionLine = lines.find(line => line.includes('Content-Disposition'));
+        
+        if (dispositionLine) {
+          const filenameMatch = dispositionLine.match(/filename="([^"]+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        // 找到空行后的内容就是文件数据
+        const dataStartIndex = part.indexOf('\r\n\r\n') + 4;
+        if (dataStartIndex > 3) {
+          const fileDataString = part.substring(dataStartIndex);
+          // 移除结尾的\r\n
+          const cleanData = fileDataString.replace(/\r\n$/, '');
+          imageData = Buffer.from(cleanData, 'binary');
+          break;
+        }
+      }
+    }
 
-    if (!imagePart || !imagePart.data) {
+    if (!imageData) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
           error: 'No image found',
-          message: '未找到图片文件'
+          message: '未找到图片数据'
         })
       };
     }
 
+    // 生成文件ID
     const fileId = uuidv4();
-    const fileName = imagePart.filename || `upload-${Date.now()}`;
-
-    // 直接从Buffer上传到Cloudinary
+    
+    // 上传到Cloudinary
     const uploadResult = await new Promise((resolve, reject) => {
       cloudinary.uploader.upload_stream(
         {
           public_id: fileId,
           folder: 'onebyone-ocr',
-          resource_type: 'auto',
-          quality: 'auto:good',
-          format: 'auto'
+          resource_type: 'auto'
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(error);
+          } else {
+            resolve(result);
+          }
         }
-      ).end(imagePart.data);
+      ).end(imageData);
     });
 
-    // 返回结果
-    const result = {
-      success: true,
-      file: {
-        id: fileId,
-        originalName: fileName,
-        fileName: `${fileId}.${uploadResult.format}`,
-        size: uploadResult.bytes,
-        mimetype: `image/${uploadResult.format}`,
-        url: uploadResult.secure_url,
-        thumbnailUrl: uploadResult.secure_url.replace('/upload/', '/upload/w_300,h_300,c_fit/'),
-        metadata: {
-          width: uploadResult.width,
-          height: uploadResult.height,
-          format: uploadResult.format,
-          bytes: uploadResult.bytes,
-          publicId: uploadResult.public_id
-        }
-      },
-      timestamp: new Date().toISOString()
-    };
-
+    // 返回成功结果
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(result)
+      body: JSON.stringify({
+        success: true,
+        file: {
+          id: fileId,
+          originalName: filename,
+          fileName: `${fileId}.${uploadResult.format}`,
+          size: uploadResult.bytes,
+          mimetype: `image/${uploadResult.format}`,
+          url: uploadResult.secure_url,
+          thumbnailUrl: uploadResult.secure_url.replace('/upload/', '/upload/w_300,h_300,c_fit/'),
+          metadata: {
+            width: uploadResult.width,
+            height: uploadResult.height,
+            format: uploadResult.format,
+            bytes: uploadResult.bytes,
+            publicId: uploadResult.public_id
+          }
+        },
+        timestamp: new Date().toISOString()
+      })
     };
 
   } catch (error) {
-    console.error('Upload error:', error);
+    console.error('Upload function error:', error);
     
     return {
       statusCode: 500,
       headers,
       body: JSON.stringify({
-        error: 'Upload failed',
-        message: error.message || '文件上传失败',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        error: 'Internal server error',
+        message: '服务器内部错误',
+        details: error.message
       })
     };
   }
 };
-
-// 简单的multipart解析器
-function parseMultipart(buffer, boundary) {
-  const parts = [];
-  const boundaryStr = `--${boundary}`;
-  const endBoundaryStr = `--${boundary}--`;
-  
-  // 将buffer转换为字符串以便处理
-  const content = buffer.toString('binary');
-  
-  // 分割内容
-  const sections = content.split(boundaryStr);
-  
-  for (let i = 1; i < sections.length; i++) {
-    const section = sections[i];
-    
-    // 跳过结束边界
-    if (section.startsWith('--')) break;
-    
-    // 解析每个部分
-    const part = parseMultipartPart(section);
-    if (part) parts.push(part);
-  }
-  
-  return parts;
-}
-
-function parseMultipartPart(section) {
-  // 查找头部结束位置
-  const headerEnd = section.indexOf('\r\n\r\n');
-  if (headerEnd === -1) return null;
-  
-  const headerPart = section.substring(0, headerEnd);
-  const dataPart = section.substring(headerEnd + 4);
-  
-  // 解析头部
-  const headers = headerPart.split('\r\n');
-  const disposition = headers.find(h => h.toLowerCase().startsWith('content-disposition:'));
-  
-  if (!disposition) return null;
-  
-  const nameMatch = disposition.match(/name="([^"]+)"/);
-  const filenameMatch = disposition.match(/filename="([^"]+)"/);
-  
-  // 转换数据为Buffer
-  const dataBuffer = Buffer.from(dataPart.replace(/\r\n$/, ''), 'binary');
-  
-  return {
-    name: nameMatch ? nameMatch[1] : null,
-    filename: filenameMatch ? filenameMatch[1] : null,
-    data: dataBuffer
-  };
-}
