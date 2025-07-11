@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Upload, ChevronDown, ChevronUp, ZoomIn, ZoomOut, RotateCw, X, History, FolderOpen, BarChart3, Book } from 'lucide-react';
+import { Camera, Upload, ChevronDown, ChevronUp, ZoomIn, ZoomOut, RotateCw, X, History, FolderOpen, BarChart3 } from 'lucide-react';
 import ImageUpload from './components/ImageUpload';
 import ModelSelector from './components/ModelSelector';
 import RecognizeButton from './components/RecognizeButton';
@@ -14,7 +14,7 @@ import HistoryView from './components/HistoryView';
 import ExportDialog from './components/ExportDialog';
 import ThemeToggle from './components/ThemeToggle';
 import ModelComparison from './components/ModelComparison';
-import UserGuide from './components/UserGuide';
+// import UserGuide from './components/UserGuide';
 import { ErrorHandler, ApiError } from './utils/errorHandler';
 import { FileHandler } from './utils/fileHandler';
 import { HistoryManager, HistoryItem } from './utils/historyManager';
@@ -616,7 +616,7 @@ function App() {
                     <h3 className="text-base font-semibold text-gray-800">图片预览</h3>
                   </div>
                   <div className="p-4">
-                    <ImagePreview uploadedImage={uploadedImage} />
+                    <ImagePreviewWithZoom uploadedImage={uploadedImage} />
                   </div>
                 </div>
               )}

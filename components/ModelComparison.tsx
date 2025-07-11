@@ -163,7 +163,12 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
   // 开始对比
   const startComparison = async () => {
     if (!uploadedImage || selectedModels.length === 0) {
-      setError(new ApiError('请先上传图片并选择至少一个模型', 'VALIDATION_ERROR'));
+      setError(new ApiError({
+        code: 'VALIDATION_ERROR',
+        message: '请先上传图片并选择至少一个模型',
+        userMessage: '请先上传图片并选择至少一个模型',
+        retryable: false
+      }));
       return;
     }
 
@@ -222,7 +227,12 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
       }
 
     } catch (error) {
-      const apiError = ErrorHandler.handleError(error);
+      const apiError = new ApiError({
+        code: 'COMPARISON_ERROR',
+        message: error instanceof Error ? error.message : '对比过程中发生错误',
+        userMessage: '对比过程中发生错误，请重试',
+        retryable: true
+      });
       setError(apiError);
     } finally {
       setIsComparing(false);
@@ -354,7 +364,7 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
       {error && (
         <ErrorMessage 
           error={error} 
-          onClose={() => setError(null)} 
+          onDismiss={() => setError(null)} 
         />
       )}
 
