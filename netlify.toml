@@ -75,6 +75,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/simple-proxy"
+  to = "/.netlify/functions/simple-proxy"
+  status = 200
+
+[[redirects]]
   from = "/api/recognition/*"
   to = "/.netlify/functions/recognition"
   status = 200
