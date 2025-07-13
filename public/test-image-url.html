@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图像URL测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-button {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .preview {
+            max-width: 300px;
+            max-height: 300px;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🖼️ 图像URL测试</h1>
+    <p>测试图像URL是否可以从Netlify Functions访问</p>
+    
+    <div class="input-group">
+        <label>图像URL:</label>
+        <input type="text" id="imageUrl" value="https://picsum.photos/400/300" placeholder="输入图像URL">
+    </div>
+    
+    <button class="test-button" onclick="testImageUrl()">🧪 测试图像下载</button>
+    <div id="result"></div>
+    
+    <h2>本地预览</h2>
+    <img id="preview" class="preview" style="display:none;">
+
+    <script>
+        async function testImageUrl() {
+            const imageUrl = document.getElementById('imageUrl').value;
+            const resultDiv = document.getElementById('result');
+            const preview = document.getElementById('preview');
+            
+            if (!imageUrl) {
+                resultDiv.innerHTML = '<div class="result error">请输入图像URL</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '测试中...';
+            preview.style.display = 'none';
+            
+            try {
+                // 首先在浏览器中测试图像
+                preview.onload = function() {
+                    console.log('Browser can load image');
+                };
+                preview.onerror = function() {
+                    console.log('Browser cannot load image');
+                };
+                preview.src = imageUrl;
+                preview.style.display = 'block';
+                
+                // 然后通过Netlify Functions测试
+                const response = await fetch('/api/simple-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: imageUrl,
+                        method: 'GET'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    let resultHtml = '';
+                    
+                    if (data.success) {
+                        const contentType = data.responseHeaders['content-type'] || 'unknown';
+                        const contentLength = data.responseHeaders['content-length'] || 'unknown';
+                        
+                        resultHtml = `<div class="result success">✅ 图像下载成功
+
+状态: ${data.status}
+内容类型: ${contentType}
+内容大小: ${contentLength} bytes
+响应头: ${JSON.stringify(data.responseHeaders, null, 2)}
+
+数据类型: ${typeof data.data}
+数据前100字符: ${typeof data.data === 'string' ? data.data.substring(0, 100) + '...' : 'Binary data'}`;
+                        
+                        // 如果是图像类型，尝试创建base64
+                        if (contentType && contentType.startsWith('image/')) {
+                            resultHtml += `
+
+✅ 确认是有效图像类型`;
+                        } else {
+                            resultHtml += `
+
+⚠️ 注意：内容类型不是图像 (${contentType})`;
+                        }
+                        
+                        resultHtml += '</div>';
+                    } else {
+                        resultHtml = `<div class="result error">❌ 图像下载失败
+
+状态: ${data.status}
+错误: ${JSON.stringify(data.data, null, 2)}</div>`;
+                    }
+                    
+                    resultDiv.innerHTML = resultHtml;
+                } else {
+                    const errorText = await response.text();
+                    resultDiv.innerHTML = `<div class="result error">❌ 代理错误
+
+状态: ${response.status}
+错误: ${errorText}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="result error">❌ 测试失败
+
+错误: ${error.message}</div>`;
+            }
+        }
+        
+        // 当URL改变时自动更新预览
+        document.getElementById('imageUrl').addEventListener('input', function() {
+            const preview = document.getElementById('preview');
+            const url = this.value;
+            if (url) {
+                preview.src = url;
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
+        });
+        
+        // 页面加载时显示默认图像
+        window.onload = function() {
+            const defaultUrl = document.getElementById('imageUrl').value;
+            if (defaultUrl) {
+                document.getElementById('preview').src = defaultUrl;
+                document.getElementById('preview').style.display = 'block';
+            }
+        };
+    </script>
+</body>
+</html>
