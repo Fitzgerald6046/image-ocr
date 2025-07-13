@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI API 连接测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .test-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .testing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .provider-name {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>🤖 AI API 连接测试</h1>
+    
+    <!-- 智谱清言测试 -->
+    <div class="test-card">
+        <div class="provider-name">🧠 智谱清言 (GLM)</div>
+        <div class="input-group">
+            <label>API Key:</label>
+            <input type="password" id="zhipu-key" placeholder="输入智谱清言API Key">
+        </div>
+        <div class="input-group">
+            <label>API URL:</label>
+            <input type="text" id="zhipu-url" value="https://open.bigmodel.cn/api/paas/v4" placeholder="API地址">
+        </div>
+        <div class="input-group">
+            <label>模型:</label>
+            <input type="text" id="zhipu-model" value="glm-4v-plus" placeholder="模型名称">
+        </div>
+        <button class="test-button" onclick="testProvider('zhipu')">测试智谱清言连接</button>
+        <div id="zhipu-result"></div>
+    </div>
+
+    <!-- Gemini测试 -->
+    <div class="test-card">
+        <div class="provider-name">🤖 Google Gemini</div>
+        <div class="input-group">
+            <label>API Key:</label>
+            <input type="password" id="gemini-key" placeholder="输入Gemini API Key">
+        </div>
+        <div class="input-group">
+            <label>API URL:</label>
+            <input type="text" id="gemini-url" value="https://generativelanguage.googleapis.com/v1beta" placeholder="API地址">
+        </div>
+        <div class="input-group">
+            <label>模型:</label>
+            <input type="text" id="gemini-model" value="gemini-2.5-pro-preview-03-25" placeholder="模型名称">
+        </div>
+        <button class="test-button" onclick="testProvider('gemini')">测试Gemini连接</button>
+        <div id="gemini-result"></div>
+    </div>
+
+    <!-- OpenAI测试 -->
+    <div class="test-card">
+        <div class="provider-name">⚡ OpenAI GPT</div>
+        <div class="input-group">
+            <label>API Key:</label>
+            <input type="password" id="openai-key" placeholder="输入OpenAI API Key">
+        </div>
+        <div class="input-group">
+            <label>API URL:</label>
+            <input type="text" id="openai-url" value="https://api.openai.com/v1" placeholder="API地址">
+        </div>
+        <div class="input-group">
+            <label>模型:</label>
+            <input type="text" id="openai-model" value="gpt-4o" placeholder="模型名称">
+        </div>
+        <button class="test-button" onclick="testProvider('openai')">测试OpenAI连接</button>
+        <div id="openai-result"></div>
+    </div>
+
+    <!-- 全部测试 -->
+    <div class="test-card">
+        <button class="test-button" onclick="testAllProviders()" style="background: #28a745;">🧪 测试所有配置的提供商</button>
+        <div id="all-result"></div>
+    </div>
+
+    <script>
+        async function testProvider(provider) {
+            const button = document.querySelector(`button[onclick="testProvider('${provider}')"]`);
+            const resultDiv = document.getElementById(`${provider}-result`);
+            
+            // 获取输入值
+            const apiKey = document.getElementById(`${provider}-key`).value;
+            const apiUrl = document.getElementById(`${provider}-url`).value;
+            const model = document.getElementById(`${provider}-model`).value;
+            
+            if (!apiKey) {
+                resultDiv.innerHTML = '<div class="result error">请输入API Key</div>';
+                return;
+            }
+            
+            // 显示测试中状态
+            button.disabled = true;
+            button.textContent = '测试中...';
+            resultDiv.innerHTML = '<div class="result testing">正在测试连接...</div>';
+            
+            try {
+                console.log(`Testing ${provider}...`);
+                
+                const response = await fetch('/api/test-ai-simple', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        provider: provider,
+                        apiKey: apiKey,
+                        apiUrl: apiUrl,
+                        model: model
+                    })
+                });
+                
+                console.log(`Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`Response data:`, data);
+                    
+                    const resultClass = data.success ? 'success' : 'error';
+                    const statusIcon = data.success ? '✅' : '❌';
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result ${resultClass}">
+                            ${statusIcon} ${data.message}
+                            
+                            详细信息:
+                            ${JSON.stringify(data.details, null, 2)}
+                            
+                            时间: ${new Date(data.timestamp).toLocaleString()}
+                        </div>
+                    `;
+                } else {
+                    const errorText = await response.text();
+                    console.error(`Error response:`, errorText);
+                    
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            ❌ 测试失败
+                            
+                            状态码: ${response.status}
+                            错误: ${errorText}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error(`Fetch error:`, error);
+                
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ 网络错误
+                        
+                        错误: ${error.message}
+                        类型: ${error.constructor.name}
+                    </div>
+                `;
+            } finally {
+                button.disabled = false;
+                button.textContent = `测试${provider === 'zhipu' ? '智谱清言' : provider === 'gemini' ? 'Gemini' : 'OpenAI'}连接`;
+            }
+        }
+        
+        async function testAllProviders() {
+            const providers = ['zhipu', 'gemini', 'openai'];
+            const button = document.querySelector(`button[onclick="testAllProviders()"]`);
+            const resultDiv = document.getElementById('all-result');
+            
+            button.disabled = true;
+            button.textContent = '测试中...';
+            resultDiv.innerHTML = '<div class="result testing">正在测试所有提供商...</div>';
+            
+            const results = [];
+            
+            for (const provider of providers) {
+                const apiKey = document.getElementById(`${provider}-key`).value;
+                if (apiKey) {
+                    await testProvider(provider);
+                    results.push(`${provider}: ${apiKey ? '已测试' : '未配置'}`);
+                } else {
+                    results.push(`${provider}: 未配置API Key`);
+                }
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="result success">
+                    🎯 批量测试完成
+                    
+                    ${results.join('\n')}
+                    
+                    请查看各个提供商的详细结果
+                </div>
+            `;
+            
+            button.disabled = false;
+            button.textContent = '🧪 测试所有配置的提供商';
+        }
+        
+        // 页面加载时自动填充一些示例值
+        window.onload = function() {
+            console.log('AI测试页面加载完成');
+            
+            // 可以在这里设置一些默认值或从localStorage读取
+            const savedConfigs = localStorage.getItem('ai-configs');
+            if (savedConfigs) {
+                try {
+                    const configs = JSON.parse(savedConfigs);
+                    // 自动填充保存的配置
+                } catch (e) {
+                    console.log('未找到保存的配置');
+                }
+            }
+        };
+    </script>
+</body>
+</html>
