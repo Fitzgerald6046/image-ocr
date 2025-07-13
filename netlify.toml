@@ -66,12 +66,12 @@
 
 [[redirects]]
   from = "/api/models"
-  to = "/.netlify/functions/models"
+  to = "/.netlify/functions/models-fixed"
   status = 200
 
 [[redirects]]
   from = "/api/models/*"
-  to = "/.netlify/functions/models"
+  to = "/.netlify/functions/models-fixed"
   status = 200
 
 # SPA 路由处理

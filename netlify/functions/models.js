@@ -278,10 +278,15 @@ async function testModelConnection(modelConfig) {
 
 // 测试Gemini连接
 async function testGeminiConnection(apiKey, apiUrl) {
-  const response = await fetch(`${apiUrl}/models?key=${apiKey}`);
+  // 确保直接连接，不使用代理
+  const response = await fetch(`${apiUrl}/models?key=${apiKey}`, {
+    // 明确禁用代理
+    agent: false
+  });
   
   if (!response.ok) {
-    throw new Error(`API连接失败: ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`API连接失败: ${response.status} - ${errorText}`);
   }
   
   return {

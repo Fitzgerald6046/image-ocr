@@ -1,5 +1,6 @@
 // AI API Proxy for Netlify Functions
 // This bypasses local proxy issues by making API calls from server-side
+// Direct server-side calls avoid DNS/proxy interference
 
 export const handler = async (event, context) => {
   const headers = {
