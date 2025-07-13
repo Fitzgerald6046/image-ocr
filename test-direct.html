@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct Connection Test</title>
+</head>
+<body>
+    <h1>Direct Connection Test</h1>
+    <button onclick="testConnection()">Test API Connection</button>
+    <div id="result"></div>
+
+    <script>
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            console.log('=== Starting fetch test ===');
+            
+            try {
+                // Test debug endpoint
+                console.log('Calling fetch...');
+                const response = await fetch('/api/debug', {
+                    method: 'GET',
+                    cache: 'no-cache',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                console.log('Fetch completed, status:', response.status);
+                console.log('Response object:', response);
+                
+                if (response.ok) {
+                    console.log('Parsing JSON...');
+                    const data = await response.json();
+                    console.log('JSON parsed:', data);
+                    
+                    resultDiv.innerHTML = `
+                        <h3 style="color: green;">✅ Connection Successful!</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Response:</strong> ${data.success}</p>
+                        <p><strong>Timestamp:</strong> ${data.timestamp}</p>
+                        <p><strong>Message:</strong> ${data.message}</p>
+                    `;
+                } else {
+                    console.log('Response not OK');
+                    const errorText = await response.text();
+                    console.log('Error text:', errorText);
+                    
+                    resultDiv.innerHTML = `
+                        <h3 style="color: red;">❌ Connection Failed</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Status Text:</strong> ${response.statusText}</p>
+                        <p><strong>Error:</strong> ${errorText}</p>
+                    `;
+                }
+            } catch (error) {
+                console.error('Catch block error:', error);
+                console.error('Error type:', error.constructor.name);
+                console.error('Error stack:', error.stack);
+                
+                resultDiv.innerHTML = `
+                    <h3 style="color: red;">❌ Network Error</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p><strong>Error Type:</strong> ${error.constructor.name}</p>
+                    <p><strong>Stack:</strong> ${error.stack}</p>
+                `;
+            }
+        }
+
+        // 页面加载后自动测试
+        window.onload = function() {
+            console.log('Page loaded, running auto test...');
+            testConnection();
+        };
+        
+        // 额外的fetch测试
+        function simpleFetchTest() {
+            console.log('=== Simple fetch test ===');
+            fetch('/api/debug')
+                .then(response => {
+                    console.log('Simple fetch - Response received:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Simple fetch - Data:', data);
+                })
+                .catch(error => {
+                    console.log('Simple fetch - Error:', error);
+                });
+        }
+    </script>
+</body>
+</html>
