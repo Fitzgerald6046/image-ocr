@@ -94,7 +94,7 @@
   from = "/*"
   to = "/index.html"
   status = 200
-  conditions = {Role = ["Not", "Path=/uploads/*,/api/*,*.js,*.css,*.png,*.jpg,*.jpeg,*.gif,*.webp,*.svg,*.ico,*.html"]}
+  force = false
 
 # 头部设置
 [[headers]]
