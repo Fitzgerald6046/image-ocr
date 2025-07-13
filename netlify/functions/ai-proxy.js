@@ -91,78 +91,104 @@ export const handler = async (event, context) => {
 async function callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl) {
   console.log('Gemini Proxy: Starting...');
   
-  // Download image and convert to base64
-  const imageResponse = await fetch(imageUrl);
-  if (!imageResponse.ok) {
-    throw new Error(`Failed to download image: ${imageResponse.status}`);
-  }
-  
-  // Get the correct MIME type from response headers
-  const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-  console.log('Gemini Proxy: Image content type:', contentType);
-  
-  const imageBuffer = await imageResponse.arrayBuffer();
-  
-  // More robust base64 encoding
-  const uint8Array = new Uint8Array(imageBuffer);
-  let binaryString = '';
-  for (let i = 0; i < uint8Array.length; i++) {
-    binaryString += String.fromCharCode(uint8Array[i]);
-  }
-  const imageBase64 = btoa(binaryString);
-  
-  console.log('Gemini Proxy: Image downloaded and converted');
-  console.log('Gemini Proxy: Image size:', imageBuffer.byteLength, 'bytes');
-  console.log('Gemini Proxy: Base64 length:', imageBase64.length);
+  try {
+    // Download image and convert to base64
+    console.log('Gemini Proxy: Downloading image from:', imageUrl);
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image: ${imageResponse.status}`);
+    }
+    
+    // Get the correct MIME type from response headers
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    console.log('Gemini Proxy: Image content type:', contentType);
+    
+    const imageBuffer = await imageResponse.arrayBuffer();
+    console.log('Gemini Proxy: Image size:', imageBuffer.byteLength, 'bytes');
+    
+    // Check image size limit (Gemini has limits)
+    if (imageBuffer.byteLength > 20 * 1024 * 1024) { // 20MB limit
+      throw new Error(`Image too large: ${imageBuffer.byteLength} bytes (max 20MB)`);
+    }
+    
+    // More robust base64 encoding
+    const uint8Array = new Uint8Array(imageBuffer);
+    let binaryString = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binaryString += String.fromCharCode(uint8Array[i]);
+    }
+    const imageBase64 = btoa(binaryString);
+    console.log('Gemini Proxy: Base64 length:', imageBase64.length);
 
-  const requestBody = {
-    contents: [{
-      parts: [
-        { text: prompt },
-        {
-          inlineData: {
-            mimeType: contentType,
-            data: imageBase64
+    const requestBody = {
+      contents: [{
+        parts: [
+          { text: prompt },
+          {
+            inlineData: {
+              mimeType: contentType,
+              data: imageBase64
+            }
           }
-        }
-      ]
-    }]
-  };
-
-  const url = `${apiUrl}/models/${model}:generateContent?key=${apiKey}`;
-  console.log('Gemini Proxy: Calling API...', url);
-  console.log('Gemini Proxy: Request body size:', JSON.stringify(requestBody).length);
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'User-Agent': 'Netlify-Function/1.0'
-    },
-    body: JSON.stringify(requestBody),
-    timeout: 25000  // 25 second timeout
-  });
-
-  console.log('Gemini Proxy: Response status:', response.status);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-  }
-
-  const result = await response.json();
-  console.log('Gemini Proxy: Success');
-
-  if (result.candidates && result.candidates[0] && result.candidates[0].content) {
-    return {
-      content: result.candidates[0].content.parts[0].text,
-      confidence: 0.95,
-      model: model,
-      provider: 'gemini'
+        ]
+      }],
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.1
+      }
     };
-  }
 
-  throw new Error('Invalid Gemini API response structure');
+    const url = `${apiUrl}/models/${model}:generateContent?key=${apiKey}`;
+    console.log('Gemini Proxy: Calling API...', url);
+    console.log('Gemini Proxy: Request body size:', JSON.stringify(requestBody).length, 'characters');
+
+    // Use the same fetch pattern that worked in simple-proxy
+    const fetchOptions = {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'User-Agent': 'Netlify-Function/1.0'
+      },
+      body: JSON.stringify(requestBody)
+    };
+    
+    console.log('Gemini Proxy: Making request...');
+    const response = await fetch(url, fetchOptions);
+
+    console.log('Gemini Proxy: Response status:', response.status);
+    console.log('Gemini Proxy: Response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Gemini Proxy: Error response:', errorText);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('Gemini Proxy: Success, response keys:', Object.keys(result));
+
+    if (result.candidates && result.candidates[0] && result.candidates[0].content) {
+      const text = result.candidates[0].content.parts[0].text;
+      console.log('Gemini Proxy: Extracted text length:', text.length);
+      return {
+        content: text,
+        confidence: 0.95,
+        model: model,
+        provider: 'gemini'
+      };
+    }
+
+    console.error('Gemini Proxy: Unexpected response structure:', result);
+    throw new Error('Invalid Gemini API response structure');
+    
+  } catch (error) {
+    console.error('Gemini Proxy: Detailed error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    throw error;
+  }
 }
 
 // OpenAI API Proxy
