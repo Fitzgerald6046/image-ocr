@@ -89,11 +89,12 @@
   to = "/.netlify/functions/models-fixed"
   status = 200
 
-# SPA 路由处理
+# SPA 路由处理 - 但排除静态文件和API路径
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  conditions = {Role = ["Not", "Path=/uploads/*,/api/*,*.js,*.css,*.png,*.jpg,*.jpeg,*.gif,*.webp,*.svg,*.ico,*.html"]}
 
 # 头部设置
 [[headers]]
