@@ -130,12 +130,17 @@ async function callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl) {
   };
 
   const url = `${apiUrl}/models/${model}:generateContent?key=${apiKey}`;
-  console.log('Gemini Proxy: Calling API...');
+  console.log('Gemini Proxy: Calling API...', url);
+  console.log('Gemini Proxy: Request body size:', JSON.stringify(requestBody).length);
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody)
+    headers: { 
+      'Content-Type': 'application/json',
+      'User-Agent': 'Netlify-Function/1.0'
+    },
+    body: JSON.stringify(requestBody),
+    timeout: 25000  // 25 second timeout
   });
 
   console.log('Gemini Proxy: Response status:', response.status);
