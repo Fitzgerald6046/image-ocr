@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单API测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>简单API测试</h1>
+    
+    <button class="test-button" onclick="testConnection()">测试基本连接</button>
+    <div id="result"></div>
+    
+    <hr>
+    
+    <h2>手动测试图像识别</h2>
+    <p>请在主应用中上传一张图片，然后选择除智谱清言之外的AI提供商进行识别测试。</p>
+    <p>主应用地址：<a href="/" target="_blank">https://chipper-cocada-99a2cc.netlify.app/</a></p>
+
+    <script>
+        async function testConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '测试中...';
+            
+            try {
+                // 测试最简单的API端点
+                const response = await fetch('/api/debug', {
+                    method: 'GET'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `✅ 基本连接成功
+状态: ${response.status}
+响应: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultDiv.innerHTML = `❌ 连接失败
+状态: ${response.status}
+错误: ${await response.text()}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 网络错误
+错误: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
