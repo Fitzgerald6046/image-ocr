@@ -61,7 +61,7 @@ async function handleTestModel(event, headers) {
     console.log('Testing model:', modelConfig.model);
 
     // Use our AI proxy to test the connection
-    const proxyUrl = `${process.env.URL || 'https://chipper-cocada-99a2cc.netlify.app'}/.netlify/functions/test-model`;
+    const proxyUrl = `${process.env.URL || 'https://chipper-cocada-99a2cc.netlify.app'}/api/test-model`;
     
     const proxyResponse = await fetch(proxyUrl, {
       method: 'POST',

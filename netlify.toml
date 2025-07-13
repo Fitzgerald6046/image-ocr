@@ -65,6 +65,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/test-model"
+  to = "/.netlify/functions/test-model"
+  status = 200
+
+[[redirects]]
   from = "/api/recognition/*"
   to = "/.netlify/functions/recognition"
   status = 200
