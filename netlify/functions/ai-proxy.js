@@ -35,11 +35,29 @@ export const handler = async (event, context) => {
 
     let result;
     
-    if (provider === 'gemini' || model.includes('gemini')) {
-      result = await callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl);
-    } else if (provider === 'openai' || model.includes('gpt')) {
+    // 智谱清言特殊处理 - 使用OpenAI格式
+    if (provider === 'zhipu' || model.includes('glm')) {
+      console.log('Using Zhipu (OpenAI format)');
       result = await callOpenAIProxy(apiUrl, apiKey, model, prompt, imageUrl);
-    } else {
+    }
+    // Gemini处理
+    else if (provider === 'gemini' || model.includes('gemini')) {
+      console.log('Using Gemini format');
+      result = await callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl);
+    } 
+    // OpenAI及兼容格式（OpenRouter, DeepSeek等）
+    else if (provider === 'openai' || provider === 'openrouter' || provider === 'deepseek' || model.includes('gpt')) {
+      console.log('Using OpenAI format');
+      result = await callOpenAIProxy(apiUrl, apiKey, model, prompt, imageUrl);
+    }
+    // Claude处理
+    else if (provider === 'claude' || model.includes('claude')) {
+      console.log('Using Claude format');
+      result = await callClaudeProxy(apiUrl, apiKey, model, prompt, imageUrl);
+    }
+    // 默认使用OpenAI格式
+    else {
+      console.log('Using generic (OpenAI) format');
       result = await callGenericProxy(apiUrl, apiKey, model, prompt, imageUrl);
     }
 
@@ -177,6 +195,69 @@ async function callOpenAIProxy(apiUrl, apiKey, model, prompt, imageUrl) {
   }
 
   throw new Error('Invalid OpenAI API response structure');
+}
+
+// Claude API Proxy
+async function callClaudeProxy(apiUrl, apiKey, model, prompt, imageUrl) {
+  console.log('Claude Proxy: Starting...');
+
+  // Claude API 使用不同的格式
+  const requestBody = {
+    model: model,
+    max_tokens: 2000,
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: prompt },
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: await imageToBase64(imageUrl) } }
+      ]
+    }]
+  };
+
+  const url = `${apiUrl}/messages`;
+  console.log('Claude Proxy: Calling API...');
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify(requestBody)
+  });
+
+  console.log('Claude Proxy: Response status:', response.status);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log('Claude Proxy: Success');
+
+  if (result.content && result.content[0] && result.content[0].text) {
+    return {
+      content: result.content[0].text,
+      confidence: 0.93,
+      model: model,
+      provider: 'claude'
+    };
+  }
+
+  throw new Error('Invalid Claude API response structure');
+}
+
+// Helper function to convert image URL to base64
+async function imageToBase64(imageUrl) {
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to download image: ${response.status}`);
+  }
+  
+  const imageBuffer = await response.arrayBuffer();
+  return btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
 }
 
 // Generic API Proxy
