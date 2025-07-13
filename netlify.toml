@@ -70,6 +70,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/debug-recognition"
+  to = "/.netlify/functions/debug-recognition"
+  status = 200
+
+[[redirects]]
   from = "/api/recognition/*"
   to = "/.netlify/functions/recognition"
   status = 200
