@@ -130,8 +130,25 @@ export const handler = async (event, context) => {
       try {
         // 下载图片转base64
         const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to download image: ${imageResponse.status}`);
+        }
+        
+        // Get correct MIME type
+        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        console.log('Debug Gemini: Image content type:', contentType);
+        
         const imageBuffer = await imageResponse.arrayBuffer();
-        const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+        
+        // More robust base64 encoding
+        const uint8Array = new Uint8Array(imageBuffer);
+        let binaryString = '';
+        for (let i = 0; i < uint8Array.length; i++) {
+          binaryString += String.fromCharCode(uint8Array[i]);
+        }
+        const imageBase64 = btoa(binaryString);
+        
+        console.log('Debug Gemini: Image size:', imageBuffer.byteLength, 'bytes');
         
         const geminiResponse = await fetch(`${modelConfig.apiUrl}/models/${modelConfig.model}:generateContent?key=${modelConfig.apiKey}`, {
           method: 'POST',
@@ -142,7 +159,7 @@ export const handler = async (event, context) => {
                 { text: prompt },
                 {
                   inlineData: {
-                    mimeType: "image/jpeg",
+                    mimeType: contentType,
                     data: imageBase64
                   }
                 }

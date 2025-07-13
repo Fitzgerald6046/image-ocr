@@ -97,10 +97,23 @@ async function callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl) {
     throw new Error(`Failed to download image: ${imageResponse.status}`);
   }
   
+  // Get the correct MIME type from response headers
+  const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+  console.log('Gemini Proxy: Image content type:', contentType);
+  
   const imageBuffer = await imageResponse.arrayBuffer();
-  const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+  
+  // More robust base64 encoding
+  const uint8Array = new Uint8Array(imageBuffer);
+  let binaryString = '';
+  for (let i = 0; i < uint8Array.length; i++) {
+    binaryString += String.fromCharCode(uint8Array[i]);
+  }
+  const imageBase64 = btoa(binaryString);
   
   console.log('Gemini Proxy: Image downloaded and converted');
+  console.log('Gemini Proxy: Image size:', imageBuffer.byteLength, 'bytes');
+  console.log('Gemini Proxy: Base64 length:', imageBase64.length);
 
   const requestBody = {
     contents: [{
@@ -108,7 +121,7 @@ async function callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl) {
         { text: prompt },
         {
           inlineData: {
-            mimeType: "image/jpeg",
+            mimeType: contentType,
             data: imageBase64
           }
         }
