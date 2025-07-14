@@ -2,14 +2,18 @@
 export const API_CONFIG = {
   // 根据环境自动选择API基础URL
   baseURL: (() => {
-    // 生产环境：使用相对路径，通过netlify.toml重定向到Functions
-    if (process.env.NODE_ENV === 'production') {
-      return '';
-    }
-    
-    // 开发环境：智能检测最佳连接方式
+    // 检测是否在浏览器环境中
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
+      
+      // 生产环境检测：如果hostname不是localhost或127.0.0.1，则认为是生产环境
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('192.168') && !hostname.includes('10.') && !hostname.includes('172.')) {
+        console.log('🚀 检测到生产环境，使用相对路径API');
+        return ''; // 生产环境使用相对路径
+      }
+      
+      // 开发环境：本地开发
+      console.log('🔧 检测到开发环境，使用本地API');
       const userAgent = navigator.userAgent || '';
       const isWindows = userAgent.includes('Windows');
       
@@ -18,9 +22,8 @@ export const API_CONFIG = {
         return 'http://127.0.0.1:3001';
       }
       
-      // 如果访问地址是localhost，检测环境
+      // 如果访问地址是localhost，使用IPv4
       if (hostname === 'localhost') {
-        // 在Windows PowerShell环境下，强制使用IPv4
         return 'http://127.0.0.1:3001';
       }
       
@@ -33,8 +36,8 @@ export const API_CONFIG = {
       return 'http://127.0.0.1:3001';
     }
     
-    // 服务端渲染或其他情况的回退
-    return 'http://localhost:3001';
+    // 服务端渲染环境 - 默认生产环境
+    return '';
   })(),
   
   // API 端点
@@ -82,7 +85,22 @@ export const getDebugInfo = () => {
     console.log('   当前hostname:', window.location.hostname);
     console.log('   当前protocol:', window.location.protocol);
     console.log('   当前port:', window.location.port);
+    console.log('   当前完整URL:', window.location.href);
     console.log('   计算出的baseURL:', API_CONFIG.baseURL);
-    console.log('   NODE_ENV:', process.env.NODE_ENV);
+    console.log('   用户代理:', navigator.userAgent);
+    console.log('   完整API URL示例:', getApiUrl('/api/models/test'));
+    
+    // 环境判断逻辑
+    const hostname = window.location.hostname;
+    const isProduction = hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('192.168') && !hostname.includes('10.') && !hostname.includes('172.');
+    console.log('   环境判断:', isProduction ? '生产环境' : '开发环境');
   }
+  return API_CONFIG;
 };
+
+// 将调试函数挂载到全局，方便在浏览器控制台调用
+if (typeof window !== 'undefined') {
+  (window as any).getDebugInfo = getDebugInfo;
+  (window as any).API_CONFIG = API_CONFIG;
+  (window as any).getApiUrl = getApiUrl;
+}
