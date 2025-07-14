@@ -2,42 +2,38 @@
 export const API_CONFIG = {
   // 根据环境自动选择API基础URL
   baseURL: (() => {
-    // 检测是否在浏览器环境中
-    if (typeof window !== 'undefined') {
-      const hostname = window.location.hostname;
-      
-      // 生产环境检测：如果hostname不是localhost或127.0.0.1，则认为是生产环境
-      if (hostname !== 'localhost' && hostname !== '127.0.0.1' && !hostname.includes('192.168') && !hostname.includes('10.') && !hostname.includes('172.')) {
-        console.log('🚀 检测到生产环境，使用相对路径API');
-        return ''; // 生产环境使用相对路径
-      }
-      
-      // 开发环境：本地开发
-      console.log('🔧 检测到开发环境，使用本地API');
-      const userAgent = navigator.userAgent || '';
-      const isWindows = userAgent.includes('Windows');
-      
-      // Windows环境下强制使用127.0.0.1避免IPv6问题
-      if (isWindows && (hostname === 'localhost' || hostname === '127.0.0.1')) {
-        return 'http://127.0.0.1:3001';
-      }
-      
-      // 如果访问地址是localhost，使用IPv4
-      if (hostname === 'localhost') {
-        return 'http://127.0.0.1:3001';
-      }
-      
-      // 如果是具体IP地址，使用相同的IP
-      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    try {
+      // 检测是否在浏览器环境中
+      if (typeof window !== 'undefined' && window.location) {
+        const hostname = window.location.hostname;
+        
+        // 生产环境检测：检查是否为Netlify域名
+        if (hostname && (hostname.includes('.netlify.app') || hostname.includes('.netlify.com') || 
+            (!hostname.includes('localhost') && !hostname.includes('127.0.0.1') && 
+             !hostname.includes('192.168') && !hostname.includes('10.') && !hostname.includes('172.')))) {
+          console.log('🚀 检测到生产环境，使用相对路径API');
+          return ''; // 生产环境使用相对路径
+        }
+        
+        // 开发环境：本地开发
+        console.log('🔧 检测到开发环境，使用本地API');
+        
+        // 简化开发环境逻辑
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          return 'http://127.0.0.1:3001';
+        }
+        
+        // 其他本地IP
         return `http://${hostname}:3001`;
       }
       
-      // 默认回退到127.0.0.1
-      return 'http://127.0.0.1:3001';
+      // 服务端渲染环境或window未定义 - 默认生产环境
+      return '';
+    } catch (error) {
+      console.warn('Error in baseURL detection:', error);
+      // 出错时默认使用生产环境配置
+      return '';
     }
-    
-    // 服务端渲染环境 - 默认生产环境
-    return '';
   })(),
   
   // API 端点
@@ -100,7 +96,11 @@ export const getDebugInfo = () => {
 
 // 将调试函数挂载到全局，方便在浏览器控制台调用
 if (typeof window !== 'undefined') {
-  (window as any).getDebugInfo = getDebugInfo;
-  (window as any).API_CONFIG = API_CONFIG;
-  (window as any).getApiUrl = getApiUrl;
+  try {
+    (window as any).getDebugInfo = getDebugInfo;
+    (window as any).API_CONFIG = API_CONFIG;
+    (window as any).getApiUrl = getApiUrl;
+  } catch (error) {
+    console.warn('Failed to mount debug functions:', error);
+  }
 }
