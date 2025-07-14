@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
@@ -8,6 +9,27 @@ import PromptGeneratorService from './promptGenerator.js';
 import IdCardValidatorService from './idCardValidator.js';
 import TableAnalyzerService from './tableAnalyzer.js';
 import AncientTextProcessorService from './ancientTextProcessor.js';
+
+// 网络配置优化
+const createAxiosConfig = () => {
+  const config = {
+    timeout: 60000, // 60秒超时
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+  };
+  
+  // 检测并使用系统代理
+  const proxy = process.env.https_proxy || process.env.HTTPS_PROXY || 
+                process.env.http_proxy || process.env.HTTP_PROXY;
+  
+  if (proxy) {
+    console.log('🌐 检测到代理设置:', proxy);
+    config.httpsAgent = new HttpsProxyAgent(proxy);
+  }
+  
+  return config;
+};
 
 // 识别类型到提示词的映射 - 优化为更简洁的版本，减少token消耗
 const RECOGNITION_PROMPTS = {
@@ -337,12 +359,14 @@ class AIModelService {
         ]
       };
 
+      const axiosConfig = createAxiosConfig();
       const response = await axios.post(apiUrl, requestData, {
+        ...axiosConfig,
         headers: {
+          ...axiosConfig.headers,
           'Content-Type': 'application/json',
           'x-goog-api-key': config.apiKey
-        },
-        timeout: 60000  // 增加到60秒
+        }  // 增加到60秒
       });
 
       // 添加详细的响应日志

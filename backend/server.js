@@ -107,9 +107,13 @@ app.use((error, req, res, next) => {
   });
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-  console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
-  console.log(`📊 健康检查: http://localhost:${PORT}/health`);
+// 启动服务器 - 优先IPv4监听（PowerShell兼容性）
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 服务器运行在:`);
+  console.log(`   主要访问: http://127.0.0.1:${PORT}`);
+  console.log(`   备用访问: http://localhost:${PORT}`);
+  console.log(`📊 健康检查: http://127.0.0.1:${PORT}/health`);
   console.log(`📁 上传目录: ${uploadsDir}`);
+  console.log(`💡 环境: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔧 监听接口: 0.0.0.0:${PORT} (IPv4优先)`);
 }); 

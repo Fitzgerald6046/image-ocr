@@ -142,18 +142,47 @@ async function callGeminiProxy(apiUrl, apiKey, model, prompt, imageUrl) {
     console.log('Gemini Proxy: Calling API...', url);
     console.log('Gemini Proxy: Request body size:', JSON.stringify(requestBody).length, 'characters');
 
-    // Use the same fetch pattern that worked in simple-proxy
+    // 优化的网络请求配置
     const fetchOptions = {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'User-Agent': 'Netlify-Function/1.0'
+        'User-Agent': 'Mozilla/5.0 (compatible; Netlify-Function/1.0)',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      timeout: 30000, // 30秒超时
+      signal: AbortSignal.timeout(30000) // 现代浏览器超时控制
     };
     
     console.log('Gemini Proxy: Making request...');
-    const response = await fetch(url, fetchOptions);
+    
+    // 网络重试机制
+    let response;
+    let lastError;
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Gemini Proxy: Attempt ${attempt}/${maxRetries}`);
+        response = await fetch(url, fetchOptions);
+        break; // 成功则跳出循环
+      } catch (error) {
+        lastError = error;
+        console.error(`Gemini Proxy: Attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          const delayMs = 1000 * attempt; // 递增延迟
+          console.log(`Gemini Proxy: Retrying in ${delayMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    if (!response) {
+      throw new Error(`Failed after ${maxRetries} attempts. Last error: ${lastError?.message}`);
+    }
 
     console.log('Gemini Proxy: Response status:', response.status);
     console.log('Gemini Proxy: Response headers:', Object.fromEntries(response.headers.entries()));
