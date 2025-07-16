@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Settings, Plus, Trash2, CheckCircle, XCircle, Loader, ChevronDown, ChevronRight, ArrowLeft, RefreshCw, X } from 'lucide-react';
 import { getApiUrl, API_CONFIG } from './src/config';
 
 interface ModelSettingsProps {
@@ -221,6 +221,27 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
     ));
   };
 
+  const addManualModel = (providerId: string, modelName: string) => {
+    if (!modelName.trim()) {
+      alert('请输入模型名称');
+      return;
+    }
+    
+    const provider = providers.find(p => p.id === providerId);
+    if (provider && provider.models.includes(modelName.trim())) {
+      alert('模型名称已存在于内置列表中');
+      return;
+    }
+    
+    setProviders(prev => prev.map(p => 
+      p.id === providerId 
+        ? { ...p, models: [...p.models, modelName.trim()] }
+        : p
+    ));
+    
+    alert(`模型 "${modelName.trim()}" 已添加到内置模型列表`);
+  };
+
   const testConnection = async (providerId: string, selectedModel?: string) => {
     setTestingProvider(providerId);
     const provider = providers.find(p => p.id === providerId);
@@ -403,6 +424,80 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
     }
   };
 
+  // 获取隐藏模型列表
+  const getHiddenModels = (): string[] => {
+    try {
+      const hiddenModels = localStorage.getItem('hiddenModels');
+      return hiddenModels ? JSON.parse(hiddenModels) : [];
+    } catch (error) {
+      console.error('❌ 获取隐藏模型列表失败:', error);
+      return [];
+    }
+  };
+
+  // 隐藏模型功能
+  const hideModel = (providerId: string, modelName: string) => {
+    try {
+      const modelValue = `${providerId}::${modelName}`;
+      const hiddenModels = JSON.parse(localStorage.getItem('hiddenModels') || '[]');
+      
+      if (!hiddenModels.includes(modelValue)) {
+        const updatedHiddenModels = [...hiddenModels, modelValue];
+        localStorage.setItem('hiddenModels', JSON.stringify(updatedHiddenModels));
+        
+        // 触发自定义事件，通知其他组件更新
+        const event = new CustomEvent('hiddenModelsUpdated', { 
+          detail: updatedHiddenModels 
+        });
+        window.dispatchEvent(event);
+        
+        console.log('✅ 模型已隐藏:', modelValue);
+        alert(`模型 "${modelName}" 已隐藏，在图像识别界面中将不再显示`);
+      }
+    } catch (error) {
+      console.error('❌ 隐藏模型失败:', error);
+      alert('隐藏模型失败，请重试');
+    }
+  };
+
+  // 清除所有模型
+  const clearAllModels = (providerId: string) => {
+    if (confirm('确定要清除此提供商的所有模型吗？此操作不可撤销。')) {
+      setProviders(prev => prev.map(p => 
+        p.id === providerId ? { ...p, models: [] } : p
+      ));
+      alert('所有模型已清除');
+    }
+  };
+
+  // 恢复隐藏的模型
+  const restoreHiddenModels = (providerId: string) => {
+    try {
+      const hiddenModels = getHiddenModels();
+      const providerHiddenModels = hiddenModels.filter(model => model.startsWith(`${providerId}::`));
+      
+      if (providerHiddenModels.length === 0) {
+        alert('没有需要恢复的隐藏模型');
+        return;
+      }
+
+      // 从隐藏列表中移除此提供商的所有模型
+      const updatedHiddenModels = hiddenModels.filter(model => !model.startsWith(`${providerId}::`));
+      localStorage.setItem('hiddenModels', JSON.stringify(updatedHiddenModels));
+      
+      // 触发自定义事件
+      const event = new CustomEvent('hiddenModelsUpdated', { 
+        detail: updatedHiddenModels 
+      });
+      window.dispatchEvent(event);
+      
+      alert(`已恢复 ${providerHiddenModels.length} 个隐藏的模型`);
+    } catch (error) {
+      console.error('❌ 恢复隐藏模型失败:', error);
+      alert('恢复隐藏模型失败，请重试');
+    }
+  };
+
   const TestStatusIcon: React.FC<{ status: 'success' | 'error' | null; isLoading: boolean }> = ({ status, isLoading }) => {
     if (isLoading) return <Loader className="w-4 h-4 animate-spin text-blue-500" />;
     if (status === 'success') return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -545,16 +640,66 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
                     </div>
 
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        可用模型
-                      </label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {provider.models.map((model) => (
-                          <div key={model} className="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm">
-                            {model}
-                          </div>
-                        ))}
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          可用模型
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => clearAllModels(provider.id)}
+                            className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                            title="清除所有模型"
+                          >
+                            清除全部
+                          </button>
+                          <button
+                            onClick={() => restoreHiddenModels(provider.id)}
+                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
+                            title="恢复隐藏的模型"
+                          >
+                            恢复隐藏
+                          </button>
+                        </div>
                       </div>
+                      
+                      {(() => {
+                        const hiddenModels = getHiddenModels();
+                        const visibleModels = provider.models.filter(model => 
+                          !hiddenModels.includes(`${provider.id}::${model}`)
+                        );
+                        const hiddenCount = provider.models.length - visibleModels.length;
+                        
+                        return (
+                          <>
+                            {hiddenCount > 0 && (
+                              <div className="mb-2 p-2 bg-yellow-50 text-yellow-700 rounded text-xs">
+                                已隐藏 {hiddenCount} 个模型，点击"恢复隐藏"可重新显示
+                              </div>
+                            )}
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {visibleModels.length === 0 ? (
+                                <div className="col-span-full p-4 text-center text-gray-500 bg-gray-50 rounded">
+                                  暂无可见模型，请更新模型列表或恢复隐藏的模型
+                                </div>
+                              ) : (
+                                visibleModels.map((model) => (
+                                  <div key={model} className="flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-700 rounded text-sm">
+                                    <span className="flex-1 truncate">{model}</span>
+                                    <button
+                                      onClick={() => hideModel(provider.id, model)}
+                                      className="ml-2 p-1 text-red-400 hover:text-red-600 hover:bg-red-100 rounded"
+                                      title="隐藏此模型"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {provider.customModels.length > 0 && (
@@ -578,29 +723,45 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newModel}
-                        onChange={(e) => setNewModel(e.target.value)}
-                        placeholder="添加自定义模型名称"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newModel}
+                          onChange={(e) => setNewModel(e.target.value)}
+                          placeholder="添加模型名称（自定义模型或手动添加的模型）"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              addCustomModel(provider.id, newModel);
+                              setNewModel('');
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => {
                             addCustomModel(provider.id, newModel);
                             setNewModel('');
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={() => {
-                          addCustomModel(provider.id, newModel);
-                          setNewModel('');
-                        }}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
+                          }}
+                          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                          title="添加模型"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => addManualModel(provider.id, newModel)}
+                          className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm"
+                          title="添加到内置模型列表"
+                        >
+                          添加到内置列表
+                        </button>
+                        <span className="text-xs text-gray-500">
+                          添加到内置列表的模型会显示在"可用模型"区域
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -9,8 +9,9 @@ import PromptGeneratorService from './promptGenerator.js';
 import IdCardValidatorService from './idCardValidator.js';
 import TableAnalyzerService from './tableAnalyzer.js';
 import AncientTextProcessorService from './ancientTextProcessor.js';
+import proxyConfig from '../utils/proxyConfig.js';
 
-// 网络配置优化
+// 网络配置优化 - 使用新的动态代理配置
 const createAxiosConfig = () => {
   const config = {
     timeout: 60000, // 60秒超时
@@ -19,13 +20,13 @@ const createAxiosConfig = () => {
     }
   };
   
-  // 检测并使用系统代理
-  const proxy = process.env.https_proxy || process.env.HTTPS_PROXY || 
-                process.env.http_proxy || process.env.HTTP_PROXY;
+  // 使用新的代理配置
+  const axiosProxyConfig = proxyConfig.getAxiosConfig();
+  Object.assign(config, axiosProxyConfig);
   
-  if (proxy) {
-    console.log('🌐 检测到代理设置:', proxy);
-    config.httpsAgent = new HttpsProxyAgent(proxy);
+  // 记录代理状态（仅在开发环境）
+  if (process.env.NODE_ENV !== 'production') {
+    proxyConfig.logProxyStatus();
   }
   
   return config;
@@ -54,9 +55,11 @@ class AIModelService {
       openrouter: this.callOpenRouterAPI.bind(this),
       deepseek: this.callDeepSeekAPI.bind(this),
       openai: this.callOpenAIAPI.bind(this),
+      claude: this.callClaudeAPI.bind(this),
       custom: this.callCustomAPI.bind(this),
       'custom-gemini': this.callCustomGeminiAPI.bind(this),
-      'custom-openai': this.callCustomOpenAIAPI.bind(this)
+      'custom-openai': this.callCustomOpenAIAPI.bind(this),
+      'custom-claude': this.callCustomClaudeAPI.bind(this)
     };
     
     // 初始化图片智能分类服务
@@ -578,10 +581,24 @@ class AIModelService {
 
     } catch (error) {
       if (error.response) {
-        console.error('OpenRouter API Error:', error.response.data);
-        throw new Error(`OpenRouter API错误: ${error.response.data.error?.message || '未知错误'}`);
+        console.error('❌ OpenRouter API错误详情:');
+        console.error('   状态码:', error.response.status);
+        console.error('   状态文本:', error.response.statusText);
+        console.error('   响应头:', JSON.stringify(error.response.headers, null, 2));
+        console.error('   响应数据:', JSON.stringify(error.response.data, null, 2));
+        
+        const errorMessage = error.response.data?.error?.message || 
+                           error.response.data?.message || 
+                           error.response.statusText || 
+                           '未知错误';
+        throw new Error(`OpenRouter API错误: ${errorMessage}`);
+      } else if (error.request) {
+        console.error('❌ OpenRouter 网络请求错误:', error.request);
+        throw new Error(`OpenRouter 网络请求失败: ${error.message}`);
+      } else {
+        console.error('❌ OpenRouter 其他错误:', error.message);
+        throw new Error(`OpenRouter 请求配置错误: ${error.message}`);
       }
-      throw error;
     }
   }
 
@@ -641,10 +658,24 @@ class AIModelService {
 
     } catch (error) {
       if (error.response) {
-        console.error('OpenAI API Error:', error.response.data);
-        throw new Error(`OpenAI API错误: ${error.response.data.error?.message || '未知错误'}`);
+        console.error('❌ OpenAI API错误详情:');
+        console.error('   状态码:', error.response.status);
+        console.error('   状态文本:', error.response.statusText);
+        console.error('   响应头:', JSON.stringify(error.response.headers, null, 2));
+        console.error('   响应数据:', JSON.stringify(error.response.data, null, 2));
+        
+        const errorMessage = error.response.data?.error?.message || 
+                           error.response.data?.message || 
+                           error.response.statusText || 
+                           '未知错误';
+        throw new Error(`OpenAI API错误: ${errorMessage}`);
+      } else if (error.request) {
+        console.error('❌ OpenAI 网络请求错误:', error.request);
+        throw new Error(`OpenAI 网络请求失败: ${error.message}`);
+      } else {
+        console.error('❌ OpenAI 其他错误:', error.message);
+        throw new Error(`OpenAI 请求配置错误: ${error.message}`);
       }
-      throw error;
     }
   }
 
@@ -1326,10 +1357,328 @@ class AIModelService {
 
     } catch (error) {
       if (error.response) {
-        console.error('自定义OpenAI API Error:', error.response.data);
-        throw new Error(`自定义OpenAI API错误: ${error.response.data.error?.message || error.response.statusText || '未知错误'}`);
+        console.error('❌ 自定义OpenAI API错误详情:');
+        console.error('   状态码:', error.response.status);
+        console.error('   状态文本:', error.response.statusText);
+        console.error('   响应头:', JSON.stringify(error.response.headers, null, 2));
+        console.error('   响应数据:', JSON.stringify(error.response.data, null, 2));
+        
+        const errorMessage = error.response.data?.error?.message || 
+                           error.response.data?.message || 
+                           error.response.statusText || 
+                           '未知错误';
+        throw new Error(`自定义OpenAI API错误: ${errorMessage}`);
+      } else if (error.request) {
+        console.error('❌ 自定义OpenAI 网络请求错误:', error.request);
+        throw new Error(`自定义OpenAI 网络请求失败: ${error.message}`);
+      } else {
+        console.error('❌ 自定义OpenAI 其他错误:', error.message);
+        throw new Error(`自定义OpenAI 请求配置错误: ${error.message}`);
       }
-      throw error;
+    }
+  }
+
+  // Claude API调用
+  async callClaudeAPI(imagePath, config, prompt) {
+    try {
+      console.log('🤖 使用Claude API进行识别...');
+      
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = imageBuffer.toString('base64');
+      
+      // 检测是否为表格识别，动态调整token数量
+      const isTableRecognition = prompt.includes('表格') || prompt.includes('table') || prompt.includes('数据结构');
+      
+      // 确保API URL正确 - Claude API默认地址
+      let apiUrl = config.apiUrl;
+      if (!apiUrl || apiUrl.trim() === '') {
+        apiUrl = 'https://api.anthropic.com/v1';
+      }
+      
+      // 规范化API URL
+      apiUrl = apiUrl.replace(/\/+$/, ''); // 移除末尾斜杠
+      if (!apiUrl.endsWith('/messages')) {
+        apiUrl = `${apiUrl}/messages`;
+      }
+      
+      const requestData = {
+        model: config.model || 'claude-3-sonnet-20240229',
+        max_tokens: isTableRecognition ? 4096 : 2048, // 增加默认token数量
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt
+              },
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: this.getMimeType(imagePath),
+                  data: base64Image
+                }
+              }
+            ]
+          }
+        ]
+      };
+
+      const axiosConfig = createAxiosConfig();
+      
+      // 正确设置Claude API认证头
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': config.apiKey,
+        'anthropic-version': '2023-06-01'
+      };
+
+      // 合并代理配置的headers
+      if (axiosConfig.headers) {
+        Object.assign(headers, axiosConfig.headers);
+      }
+
+      console.log('📋 Claude API 请求配置:', {
+        url: apiUrl,
+        model: config.model,
+        maxTokens: requestData.max_tokens,
+        hasImage: true,
+        hasApiKey: !!config.apiKey,
+        apiKeyPrefix: config.apiKey ? config.apiKey.substring(0, 8) + '...' : 'none'
+      });
+
+      const response = await axios.post(apiUrl, requestData, {
+        ...axiosConfig,
+        headers,
+        timeout: 120000 // 增加超时时间到2分钟
+      });
+      
+      console.log('📋 Claude API 响应:', response.status);
+      console.log('📋 Claude 响应数据结构:', JSON.stringify(response.data, null, 2));
+
+      if (response.data.content && response.data.content.length > 0) {
+        const content = response.data.content[0].text;
+        return {
+          content,
+          confidence: 0.9,
+          metadata: {
+            finishReason: response.data.stop_reason,
+            usage: response.data.usage,
+            provider: 'claude'
+          }
+        };
+      } else {
+        console.error('❌ Claude API返回的数据结构异常:', response.data);
+        throw new Error('Claude API返回了空结果或格式异常');
+      }
+
+    } catch (error) {
+      console.error('❌ Claude API调用失败:', error);
+      
+      if (error.response) {
+        console.error('❌ Claude API错误详情:');
+        console.error('   状态码:', error.response.status);
+        console.error('   状态文本:', error.response.statusText);
+        console.error('   响应头:', JSON.stringify(error.response.headers, null, 2));
+        console.error('   响应数据:', JSON.stringify(error.response.data, null, 2));
+        
+        let errorMessage = '未知错误';
+        
+        // 根据状态码提供更具体的错误信息
+        if (error.response.status === 401) {
+          errorMessage = 'API密钥无效或未提供。请检查Claude API密钥是否正确。';
+        } else if (error.response.status === 403) {
+          errorMessage = 'API访问被拒绝。请检查API密钥权限或账户状态。';
+        } else if (error.response.status === 429) {
+          errorMessage = '请求频率超限。请稍后重试或检查API配额。';
+        } else if (error.response.status === 400) {
+          const apiError = error.response.data?.error;
+          if (apiError?.type === 'invalid_request_error') {
+            errorMessage = `请求格式错误: ${apiError.message || '请检查请求参数'}`;
+          } else {
+            errorMessage = `请求参数错误: ${error.response.data?.error?.message || '请检查模型名称和参数'}`;
+          }
+        } else if (error.response.status >= 500) {
+          errorMessage = 'Claude API服务器错误，请稍后重试。';
+        } else {
+          errorMessage = error.response.data?.error?.message || 
+                       error.response.data?.message || 
+                       error.response.statusText;
+        }
+        
+        throw new Error(`Claude API错误 (${error.response.status}): ${errorMessage}`);
+      } else if (error.request) {
+        console.error('❌ Claude 网络请求错误:', error.code || error.message);
+        
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('Claude API请求超时，请检查网络连接或稍后重试');
+        } else if (error.code === 'ENOTFOUND') {
+          throw new Error('无法连接到Claude API服务器，请检查网络连接');
+        } else {
+          throw new Error(`Claude 网络连接失败: ${error.message}`);
+        }
+      } else {
+        console.error('❌ Claude 其他错误:', error.message);
+        throw new Error(`Claude 请求配置错误: ${error.message}`);
+      }
+    }
+  }
+
+  // 自定义Claude API调用
+  async callCustomClaudeAPI(imagePath, config, prompt) {
+    try {
+      console.log('🔧 使用自定义Claude API格式');
+      
+      const imageBuffer = fs.readFileSync(imagePath);
+      const base64Image = imageBuffer.toString('base64');
+      
+      // 检测是否为表格识别，动态调整token数量
+      const isTableRecognition = prompt.includes('表格') || prompt.includes('table') || prompt.includes('数据结构');
+      
+      // 规范化API URL
+      let apiUrl = config.apiUrl;
+      apiUrl = apiUrl.replace(/\/+$/, ''); // 移除末尾斜杠
+      if (!apiUrl.endsWith('/messages')) {
+        apiUrl = `${apiUrl}/messages`;
+      }
+      
+      const requestData = {
+        model: config.model || 'claude-3-sonnet-20240229',
+        max_tokens: isTableRecognition ? 4096 : 2048,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: prompt
+              },
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: this.getMimeType(imagePath),
+                  data: base64Image
+                }
+              }
+            ]
+          }
+        ]
+      };
+
+      const axiosConfig = createAxiosConfig();
+      
+      // 支持多种认证方式的自定义Claude API
+      const authHeaders = [
+        { 'x-api-key': config.apiKey, 'anthropic-version': '2023-06-01' },
+        { 'Authorization': `Bearer ${config.apiKey}`, 'anthropic-version': '2023-06-01' },
+        { 'api-key': config.apiKey },
+        { 'Authorization': `Bearer ${config.apiKey}` }
+      ];
+
+      console.log('📋 自定义Claude API 请求配置:', {
+        url: apiUrl,
+        model: config.model,
+        maxTokens: requestData.max_tokens,
+        hasApiKey: !!config.apiKey
+      });
+
+      let lastError;
+      for (const [index, authHeader] of authHeaders.entries()) {
+        try {
+          const authMethod = Object.keys(authHeader)[0];
+          console.log(`🔐 尝试认证方式 ${index + 1}/4: ${authMethod}`);
+          
+          const headers = {
+            'Content-Type': 'application/json',
+            ...authHeader
+          };
+          
+          // 合并代理配置的headers
+          if (axiosConfig.headers) {
+            Object.assign(headers, axiosConfig.headers);
+          }
+
+          const response = await axios.post(apiUrl, requestData, {
+            ...axiosConfig,
+            headers,
+            timeout: 120000
+          });
+          
+          console.log('📋 自定义Claude API 响应:', response.status);
+          console.log('✅ 认证成功，使用方式:', authMethod);
+
+          if (response.data.content && response.data.content.length > 0) {
+            const content = response.data.content[0].text;
+            return {
+              content,
+              confidence: 0.9,
+              metadata: {
+                finishReason: response.data.stop_reason,
+                usage: response.data.usage,
+                authMethod
+              }
+            };
+          } else {
+            throw new Error('API返回了空结果或格式异常');
+          }
+        } catch (error) {
+          lastError = error;
+          const authMethod = Object.keys(authHeader)[0];
+          console.log(`❌ 认证方式 ${authMethod} 失败:`, error.response?.status || error.message);
+          continue;
+        }
+      }
+      
+      // 所有认证方式都失败，抛出最后一个错误
+      throw lastError;
+
+    } catch (error) {
+      console.error('❌ 自定义Claude API调用失败:', error);
+      
+      if (error.response) {
+        console.error('❌ 自定义Claude API错误详情:');
+        console.error('   状态码:', error.response.status);
+        console.error('   状态文本:', error.response.statusText);
+        console.error('   响应头:', JSON.stringify(error.response.headers, null, 2));
+        console.error('   响应数据:', JSON.stringify(error.response.data, null, 2));
+        
+        let errorMessage = '未知错误';
+        
+        // 根据状态码提供更具体的错误信息
+        if (error.response.status === 401) {
+          errorMessage = 'API密钥无效或认证方式不正确。请检查自定义Claude API密钥和认证方式。';
+        } else if (error.response.status === 403) {
+          errorMessage = 'API访问被拒绝。请检查API密钥权限或中转服务配置。';
+        } else if (error.response.status === 429) {
+          errorMessage = '请求频率超限。请稍后重试或检查API配额限制。';
+        } else if (error.response.status === 400) {
+          const apiError = error.response.data?.error;
+          errorMessage = `请求参数错误: ${apiError?.message || error.response.data?.message || '请检查模型名称和参数'}`;
+        } else if (error.response.status >= 500) {
+          errorMessage = '自定义Claude API服务器错误，请稍后重试或联系API提供方。';
+        } else {
+          errorMessage = error.response.data?.error?.message || 
+                       error.response.data?.message || 
+                       error.response.statusText;
+        }
+        
+        throw new Error(`自定义Claude API错误 (${error.response.status}): ${errorMessage}`);
+      } else if (error.request) {
+        console.error('❌ 自定义Claude 网络请求错误:', error.code || error.message);
+        
+        if (error.code === 'ECONNABORTED') {
+          throw new Error('自定义Claude API请求超时，请检查网络连接或API服务状态');
+        } else if (error.code === 'ENOTFOUND') {
+          throw new Error('无法连接到自定义Claude API服务器，请检查API地址和网络连接');
+        } else {
+          throw new Error(`自定义Claude 网络连接失败: ${error.message}`);
+        }
+      } else {
+        console.error('❌ 自定义Claude 其他错误:', error.message);
+        throw new Error(`自定义Claude 请求配置错误: ${error.message}`);
+      }
     }
   }
 }

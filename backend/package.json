@@ -6,7 +6,12 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "start:wsl": "HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 node server.js",
+    "start:noproxy": "node server.js",
     "dev": "nodemon server.js",
+    "dev:wsl": "HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 nodemon server.js",
+    "dev:noproxy": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {

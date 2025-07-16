@@ -7,22 +7,48 @@ interface ModelSelectorProps {
   onConfigureModels: () => void;
 }
 
+interface ModelInfo {
+  value: string;
+  label: string;
+  providerId: string;
+  providerName: string;
+}
+
+// 获取隐藏模型列表
+const getHiddenModels = (): string[] => {
+  try {
+    const hiddenModels = localStorage.getItem('hiddenModels');
+    return hiddenModels ? JSON.parse(hiddenModels) : [];
+  } catch (error) {
+    console.error('Error loading hidden models:', error);
+    return [];
+  }
+};
+
 // 从localStorage获取用户配置的模型列表
-const getAvailableModels = () => {
+const getAvailableModels = (): ModelInfo[] => {
   try {
     const savedProviders = localStorage.getItem('aiProviders');
     if (savedProviders) {
       const providers = JSON.parse(savedProviders);
-      const availableModels: Array<{value: string, label: string, providerId: string, providerName: string}> = [];
+      const hiddenModels = getHiddenModels();
+      const availableModels: ModelInfo[] = [];
       
       providers.forEach((provider: any) => {
         // 只包含已配置API密钥的提供商的模型
         if (provider.apiKey && provider.apiKey.trim()) {
           // 添加内置模型
           provider.models.forEach((model: string) => {
+            const modelValue = `${provider.id}::${model}`;
+            
+            // 如果模型被隐藏，则跳过
+            if (hiddenModels.includes(modelValue)) {
+              return;
+            }
+            
             availableModels.push({
-              value: `${provider.id}::${model}`, // 使用提供商ID作为前缀区分重名模型
-              label: `${model} (${provider.name})`, // 显示提供商名称
+              value: modelValue,
+              label: `${model} (${provider.name})`,
               providerId: provider.id,
               providerName: provider.name
             });
@@ -31,9 +57,16 @@ const getAvailableModels = () => {
           // 添加自定义模型
           if (provider.customModels) {
             provider.customModels.forEach((model: string) => {
+              const modelValue = `${provider.id}::${model}`;
+              
+              // 如果模型被隐藏，则跳过
+              if (hiddenModels.includes(modelValue)) {
+                return;
+              }
+              
               availableModels.push({
-                value: `${provider.id}::${model}`, // 使用提供商ID作为前缀
-                label: `${model} (${provider.name} - 自定义)`, // 标注为自定义模型
+                value: modelValue,
+                label: `${model} (${provider.name} - 自定义)`,
                 providerId: provider.id,
                 providerName: provider.name
               });
@@ -48,7 +81,6 @@ const getAvailableModels = () => {
     console.error('Error loading models from localStorage:', error);
   }
   
-  // 如果没有配置，返回空数组
   return [];
 };
 
@@ -57,7 +89,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   onModelChange,
   onConfigureModels
 }) => {
-  const [availableModels, setAvailableModels] = useState<Array<{value: string, label: string, providerId: string, providerName: string}>>([]);
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
   
   // 组件加载时和localStorage变化时更新可用模型
   useEffect(() => {
@@ -81,8 +113,15 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       updateModels();
     };
     
+    // 监听隐藏模型列表更新
+    const handleHiddenModelsUpdate = (event: any) => {
+      console.log('📡 检测到隐藏模型列表更新:', event.detail);
+      updateModels();
+    };
+    
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('aiProvidersUpdated', handleProvidersUpdate);
+    window.addEventListener('hiddenModelsUpdated', handleHiddenModelsUpdate);
     
     // 由于同一页面内的localStorage变化不会触发storage事件，
     // 我们需要手动定期检查或在配置页面返回时更新
@@ -91,6 +130,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('aiProvidersUpdated', handleProvidersUpdate);
+      window.removeEventListener('hiddenModelsUpdated', handleHiddenModelsUpdate);
       clearInterval(interval);
     };
   }, []);
@@ -165,4 +205,4 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   );
 };
 
-export default ModelSelector; 
+export default ModelSelector;

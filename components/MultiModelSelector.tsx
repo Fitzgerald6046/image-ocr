@@ -15,7 +15,63 @@ interface ModelInfo {
   providerId: string;
   providerName: string;
   icon?: string;
+  category?: string;
+  performance?: 'high' | 'medium' | 'low';
+  cost?: 'high' | 'medium' | 'low' | 'free';
+  specialty?: string[];
 }
+
+// 模型分类和元数据
+const getModelMetadata = (modelName: string, providerId: string): Partial<ModelInfo> => {
+  const model = modelName.toLowerCase();
+  
+  // 分类逻辑
+  let category = 'general';
+  let performance: 'high' | 'medium' | 'low' = 'medium';
+  let cost: 'high' | 'medium' | 'low' | 'free' = 'medium';
+  const specialty: string[] = [];
+  
+  // OpenRouter特殊处理
+  if (providerId === 'openrouter') {
+    if (model.includes('free')) cost = 'free';
+    if (model.includes('gpt-4') || model.includes('claude-3-5') || model.includes('gemini-2')) {
+      performance = 'high';
+      cost = 'high';
+    }
+    if (model.includes('vision') || model.includes('vision-preview')) {
+      specialty.push('视觉');
+    }
+  }
+  
+  // 按模型名称分类
+  if (model.includes('gpt-4') || model.includes('claude-3') || model.includes('gemini-2')) {
+    category = 'flagship';
+    performance = 'high';
+  } else if (model.includes('gpt-3.5') || model.includes('claude-instant') || model.includes('gemini-1.5')) {
+    category = 'standard';
+    performance = 'medium';
+  } else if (model.includes('free') || model.includes('lite') || model.includes('mini')) {
+    category = 'budget';
+    cost = 'free';
+    performance = 'low';
+  }
+  
+  // 专业特性检测
+  if (model.includes('vision') || model.includes('multi') || model.includes('image')) {
+    specialty.push('图像识别');
+  }
+  if (model.includes('code') || model.includes('programming')) {
+    specialty.push('代码生成');
+  }
+  if (model.includes('reasoning') || model.includes('logic')) {
+    specialty.push('推理分析');
+  }
+  if (model.includes('instruct') || model.includes('chat')) {
+    specialty.push('对话交互');
+  }
+  
+  return { category, performance, cost, specialty };
+};
 
 // 从localStorage获取用户配置的模型列表
 const getAvailableModels = (): ModelInfo[] => {
@@ -30,24 +86,28 @@ const getAvailableModels = (): ModelInfo[] => {
         if (provider.apiKey && provider.apiKey.trim()) {
           // 添加内置模型
           provider.models.forEach((model: string) => {
+            const metadata = getModelMetadata(model, provider.id);
             availableModels.push({
               value: `${provider.id}::${model}`,
               label: `${model} (${provider.name})`,
               providerId: provider.id,
               providerName: provider.name,
-              icon: provider.icon || '🤖'
+              icon: provider.icon || '🤖',
+              ...metadata
             });
           });
           
           // 添加自定义模型
           if (provider.customModels) {
             provider.customModels.forEach((model: string) => {
+              const metadata = getModelMetadata(model, provider.id);
               availableModels.push({
                 value: `${provider.id}::${model}`,
                 label: `${model} (${provider.name} - 自定义)`,
                 providerId: provider.id,
                 providerName: provider.name,
-                icon: provider.icon || '🔧'
+                icon: provider.icon || '🔧',
+                ...metadata
               });
             });
           }
@@ -74,7 +134,7 @@ const MultiModelSelector: React.FC<MultiModelSelectorProps> = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [concurrentLimit, setConcurrentLimit] = useState(2);
   const [timeoutSetting, setTimeoutSetting] = useState(30);
-
+  
   // 组件加载时和localStorage变化时更新可用模型
   useEffect(() => {
     const updateModels = () => {
@@ -125,7 +185,6 @@ const MultiModelSelector: React.FC<MultiModelSelectorProps> = ({
 
   // 智能推荐模型组合
   const getRecommendedModels = () => {
-    const providers = [...new Set(availableModels.map(m => m.providerId))];
     const recommended: string[] = [];
     
     // 优先选择不同提供商的高性能模型
@@ -169,30 +228,32 @@ const MultiModelSelector: React.FC<MultiModelSelectorProps> = ({
       <div className="p-4 space-y-4">
         {/* 快速选择按钮 */}
         {availableModels.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => handleQuickSelect(getRecommendedModels())}
-              className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors flex items-center gap-1"
-            >
-              <Zap className="w-3 h-3" />
-              智能推荐
-            </button>
-            <button
-              onClick={() => handleQuickSelect(availableModels.slice(0, 3).map(m => m.value))}
-              className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm hover:bg-green-200 transition-colors flex items-center gap-1"
-            >
-              <Users className="w-3 h-3" />
-              前3个模型
-            </button>
-            {selectedModels.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
               <button
-                onClick={handleClearAll}
-                className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors flex items-center gap-1"
+                onClick={() => handleQuickSelect(getRecommendedModels())}
+                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm hover:bg-blue-200 transition-colors flex items-center gap-1"
               >
-                <X className="w-3 h-3" />
-                清除选择
+                <Zap className="w-3 h-3" />
+                智能推荐
               </button>
-            )}
+              <button
+                onClick={() => handleQuickSelect(availableModels.slice(0, 3).map(m => m.value))}
+                className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm hover:bg-green-200 transition-colors flex items-center gap-1"
+              >
+                <Users className="w-3 h-3" />
+                前3个模型
+              </button>
+              {selectedModels.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm hover:bg-red-200 transition-colors flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  清除选择
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -204,7 +265,7 @@ const MultiModelSelector: React.FC<MultiModelSelectorProps> = ({
           >
             <span className="text-gray-700">
               {availableModels.length > 0 ? 
-                (selectedModels.length > 0 ? `已选择 ${selectedModels.length} 个模型` : '点击选择要对比的模型') : 
+                (selectedModels.length > 0 ? `已选择 ${selectedModels.length} 个模型` : `点击选择模型 (共${availableModels.length}个可用)`) : 
                 '请先配置AI模型'
               }
             </span>
@@ -213,34 +274,65 @@ const MultiModelSelector: React.FC<MultiModelSelectorProps> = ({
 
           {/* 下拉选择列表 */}
           {showDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-20 max-h-96 overflow-hidden">
               {availableModels.length === 0 ? (
                 <div className="p-3 text-gray-500 text-center">
                   暂无可用模型，请先配置模型
                 </div>
               ) : (
-                availableModels.map((model) => (
-                  <div
-                    key={model.value}
-                    className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                      selectedModels.includes(model.value) ? 'bg-blue-50' : ''
-                    }`}
-                    onClick={() => handleModelToggle(model.value)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">{model.icon}</span>
-                        <div>
-                          <div className="font-medium text-gray-800">{model.label}</div>
-                          <div className="text-sm text-gray-500">{model.providerName}</div>
+                <div className="flex-1 overflow-y-auto max-h-80">
+                  {availableModels.map((model) => (
+                    <div
+                      key={model.value}
+                      className={`p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                        selectedModels.includes(model.value) ? 'bg-blue-50' : ''
+                      }`}
+                      onClick={() => handleModelToggle(model.value)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <span className="text-lg">{model.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-800 truncate">{model.label}</div>
+                            <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                              <span>{model.providerName}</span>
+                              {model.performance && (
+                                <span className={`px-1 py-0.5 rounded ${
+                                  model.performance === 'high' ? 'bg-green-100 text-green-700' :
+                                  model.performance === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {model.performance === 'high' ? '高性能' :
+                                   model.performance === 'medium' ? '中等' : '基础'}
+                                </span>
+                              )}
+                              {model.cost && (
+                                <span className={`px-1 py-0.5 rounded ${
+                                  model.cost === 'free' ? 'bg-blue-100 text-blue-700' :
+                                  model.cost === 'low' ? 'bg-green-100 text-green-700' :
+                                  model.cost === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {model.cost === 'free' ? '免费' :
+                                   model.cost === 'low' ? '低成本' :
+                                   model.cost === 'medium' ? '中等' : '高成本'}
+                                </span>
+                              )}
+                              {model.specialty && model.specialty.length > 0 && (
+                                <span className="px-1 py-0.5 rounded bg-purple-100 text-purple-700">
+                                  {model.specialty[0]}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
+                        {selectedModels.includes(model.value) && (
+                          <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                        )}
                       </div>
-                      {selectedModels.includes(model.value) && (
-                        <Check className="w-5 h-5 text-blue-600" />
-                      )}
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           )}

@@ -131,7 +131,8 @@ class ImageClassifierService {
    */
   async classifyImage(imagePath, modelConfig) {
     try {
-      const aiService = new (await import('./aiModels.js')).default();
+      const aiServiceModule = await import('./aiModels.js');
+      const aiService = aiServiceModule.default;
       
       console.log('🔍 开始图片智能分类...');
       
@@ -296,7 +297,8 @@ class ImageClassifierService {
    */
   async translateToSimplifiedChinese(text, modelConfig) {
     try {
-      const aiService = new (await import('./aiModels.js')).default();
+      const aiServiceModule = await import('./aiModels.js');
+      const aiService = aiServiceModule.default;
       
       const translatePrompt = `请将以下文本翻译为简体中文，保持原意不变：
 
