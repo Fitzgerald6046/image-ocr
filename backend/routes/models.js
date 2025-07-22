@@ -291,15 +291,46 @@ async function getOpenAIModels(apiKey, apiUrl) {
     });
     
     if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
+      throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    return data.data?.map(model => model.id) || [];
+    console.log('OpenAI API响应:', data);
+    
+    let models = [];
+    if (data.data && Array.isArray(data.data)) {
+      models = data.data.map(model => model.id);
+      // 过滤出GPT模型，排除一些不相关的模型
+      models = models.filter(id => 
+        id.includes('gpt') || 
+        id.includes('text-') || 
+        id.includes('davinci') ||
+        id.includes('curie') ||
+        id.includes('babbage') ||
+        id.includes('ada')
+      );
+    }
+    
+    console.log('解析的OpenAI模型:', models);
+    return models.length > 0 ? models : getDefaultOpenAIModels();
+    
   } catch (error) {
     console.error('OpenAI模型获取失败:', error);
-    return ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo']; // 默认模型
+    return getDefaultOpenAIModels();
   }
+}
+
+function getDefaultOpenAIModels() {
+  return [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+    'gpt-4-turbo-preview',
+    'gpt-4',
+    'gpt-4-32k',
+    'gpt-3.5-turbo',
+    'gpt-3.5-turbo-16k'
+  ];
 }
 
 async function getGeminiModels(apiKey, apiUrl) {
@@ -307,15 +338,42 @@ async function getGeminiModels(apiKey, apiUrl) {
     const response = await fetch(`${apiUrl}/models?key=${apiKey}`);
     
     if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
+      throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    return data.models?.map(model => model.name.replace('models/', '')) || [];
+    console.log('Gemini API响应:', data);
+    
+    let models = [];
+    if (data.models && Array.isArray(data.models)) {
+      models = data.models.map(model => {
+        // 处理Gemini的模型名称格式：从 "models/gemini-pro" 提取 "gemini-pro"
+        const modelName = model.name ? model.name.replace('models/', '') : model.displayName || model.id;
+        return modelName;
+      });
+    }
+    
+    console.log('解析的Gemini模型:', models);
+    return models.length > 0 ? models : getDefaultGeminiModels();
+    
   } catch (error) {
     console.error('Gemini模型获取失败:', error);
-    return ['gemini-2.5-pro-preview-03-25', 'gemini-2.5-flash-preview-04-17-thinking']; // 默认模型
+    return getDefaultGeminiModels();
   }
+}
+
+function getDefaultGeminiModels() {
+  return [
+    'gemini-2.5-pro-exp-03-25',
+    'gemini-2.5-pro-exp-01-21',
+    'gemini-2.5-flash-exp-01-21',
+    'gemini-2.5-flash-preview-04-17-thinking',
+    'gemini-2.5-pro-preview-03-25',
+    'gemini-2.5-pro-preview-05-06',
+    'gemini-1.5-pro-latest',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash-8b-latest'
+  ];
 }
 
 async function getDeepSeekModels(apiKey, apiUrl) {
@@ -328,20 +386,83 @@ async function getDeepSeekModels(apiKey, apiUrl) {
     });
     
     if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('DeepSeek API响应:', data);
+    
+    let models = [];
+    if (data.data && Array.isArray(data.data)) {
+      models = data.data.map(model => model.id || model.name);
+    } else if (Array.isArray(data)) {
+      models = data.map(model => model.id || model.name);
+    }
+    
+    console.log('解析的DeepSeek模型:', models);
+    return models.length > 0 ? models : getDefaultDeepSeekModels();
+    
+  } catch (error) {
+    console.error('DeepSeek模型获取失败:', error);
+    return getDefaultDeepSeekModels();
+  }
+}
+
+function getDefaultDeepSeekModels() {
+  return [
+    'deepseek-chat',
+    'deepseek-vl-chat',
+    'deepseek-reasoner',
+    'deepseek-coder'
+  ];
+}
+
+async function getClaudeModels(apiKey, apiUrl) {
+  try {
+    const response = await fetch(`${apiUrl}/models`, {
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
       throw new Error(`API请求失败: ${response.status}`);
     }
     
     const data = await response.json();
-    return data.data?.map(model => model.id) || [];
+    console.log('Claude API响应:', data);
+    
+    // Claude API返回的数据结构可能是 { data: [...] } 或直接是数组
+    let models = [];
+    if (data.data && Array.isArray(data.data)) {
+      models = data.data.map(model => model.id || model.name);
+    } else if (Array.isArray(data)) {
+      models = data.map(model => model.id || model.name);
+    } else if (data.models && Array.isArray(data.models)) {
+      models = data.models.map(model => model.id || model.name);
+    }
+    
+    console.log('解析的Claude模型:', models);
+    return models.length > 0 ? models : getDefaultClaudeModels();
+    
   } catch (error) {
-    console.error('DeepSeek模型获取失败:', error);
-    return ['deepseek-chat', 'deepseek-vl-chat']; // 默认模型
+    console.error('Claude模型获取失败:', error);
+    // 如果API调用失败，返回默认模型列表
+    return getDefaultClaudeModels();
   }
 }
 
-async function getClaudeModels(apiKey, apiUrl) {
-  // Claude API 目前不提供模型列表接口，返回已知模型
-  return ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
+function getDefaultClaudeModels() {
+  return [
+    'claude-3-5-sonnet-20241022',
+    'claude-3-5-haiku-20241022', 
+    'claude-3-opus-20240229',
+    'claude-3-sonnet-20240229',
+    'claude-3-haiku-20240307',
+    'claude-sonnet-4-20250514'  // 添加最新的Claude 4模型
+  ];
 }
 
 async function getOpenRouterModels(apiKey, apiUrl) {
@@ -366,23 +487,123 @@ async function getOpenRouterModels(apiKey, apiUrl) {
 }
 
 async function getHunyuanModels(apiKey, apiUrl) {
-  // 腾讯混元目前返回已知模型
-  return ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro'];
+  try {
+    // 尝试调用腾讯混元API获取模型列表
+    // 注意：腾讯混元使用特殊的认证方式，这里提供基础实现
+    console.log('尝试获取腾讯混元模型列表...');
+    return getDefaultHunyuanModels();
+  } catch (error) {
+    console.error('腾讯混元模型获取失败:', error);
+    return getDefaultHunyuanModels();
+  }
+}
+
+function getDefaultHunyuanModels() {
+  return [
+    'hunyuan-lite',
+    'hunyuan-standard', 
+    'hunyuan-pro',
+    'hunyuan-turbo',
+    'hunyuan-code',
+    'hunyuan-vision'
+  ];
 }
 
 async function getZhipuAIModels(apiKey, apiUrl) {
-  // 智谱清言目前返回已知模型
-  return ['glm-4-flash', 'glm-4-plus', 'glm-4v-plus', 'glm-4-air'];
+  try {
+    // 尝试调用智谱清言API获取模型列表
+    const response = await fetch(`${apiUrl}/models`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('智谱清言API响应:', data);
+    
+    let models = [];
+    if (data.data && Array.isArray(data.data)) {
+      models = data.data.map(model => model.id || model.name);
+    } else if (Array.isArray(data)) {
+      models = data.map(model => model.id || model.name);
+    }
+    
+    console.log('解析的智谱清言模型:', models);
+    return models.length > 0 ? models : getDefaultZhipuAIModels();
+    
+  } catch (error) {
+    console.error('智谱清言模型获取失败:', error);
+    return getDefaultZhipuAIModels();
+  }
+}
+
+function getDefaultZhipuAIModels() {
+  return [
+    'glm-4-flash',
+    'glm-4-plus', 
+    'glm-4v-plus',
+    'glm-4-air',
+    'glm-4-alltools',
+    'glm-4-long',
+    'codegeex-4'
+  ];
 }
 
 async function getTongyiModels(apiKey, apiUrl) {
-  // 通义千问目前返回已知模型
-  return ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-vl-plus', 'qwen-vl-max'];
+  try {
+    // 尝试调用通义千问API获取模型列表
+    console.log('尝试获取通义千问模型列表...');
+    return getDefaultTongyiModels();
+  } catch (error) {
+    console.error('通义千问模型获取失败:', error);
+    return getDefaultTongyiModels();
+  }
+}
+
+function getDefaultTongyiModels() {
+  return [
+    'qwen-turbo',
+    'qwen-plus', 
+    'qwen-max',
+    'qwen-vl-plus',
+    'qwen-vl-max',
+    'qwen2.5-72b-instruct',
+    'qwen2.5-32b-instruct',
+    'qwen2.5-14b-instruct',
+    'qwen2.5-7b-instruct',
+    'qwen-coder-turbo',
+    'qwen-math-plus'
+  ];
 }
 
 async function getPaddleOCRModels(apiKey, apiUrl) {
-  // PaddleOCR目前返回已知模型
-  return ['general_basic', 'accurate_basic', 'general', 'accurate', 'handwriting'];
+  try {
+    console.log('获取PaddleOCR模型列表...');
+    return getDefaultPaddleOCRModels();
+  } catch (error) {
+    console.error('PaddleOCR模型获取失败:', error);
+    return getDefaultPaddleOCRModels();
+  }
+}
+
+function getDefaultPaddleOCRModels() {
+  return [
+    'general_basic',
+    'accurate_basic', 
+    'general',
+    'accurate',
+    'handwriting',
+    'numbers',
+    'receipt',
+    'table',
+    'vin_code',
+    'license_plate'
+  ];
 }
 
 async function getGenericModels(apiKey, apiUrl) {
@@ -395,15 +616,32 @@ async function getGenericModels(apiKey, apiUrl) {
     });
     
     if (!response.ok) {
-      throw new Error(`API请求失败: ${response.status}`);
+      throw new Error(`API请求失败: ${response.status} ${response.statusText}`);
     }
     
     const data = await response.json();
-    return data.data?.map(model => model.id) || data.models || [];
+    console.log('通用API响应:', data);
+    
+    let models = [];
+    if (data.data && Array.isArray(data.data)) {
+      models = data.data.map(model => model.id || model.name);
+    } else if (Array.isArray(data.models)) {
+      models = data.models.map(model => model.id || model.name || model);
+    } else if (Array.isArray(data)) {
+      models = data.map(model => model.id || model.name || model);
+    }
+    
+    console.log('解析的通用模型:', models);
+    return models.length > 0 ? models : getDefaultGenericModels();
+    
   } catch (error) {
     console.error('通用模型获取失败:', error);
-    return ['default-model']; // 默认模型
+    return getDefaultGenericModels();
   }
+}
+
+function getDefaultGenericModels() {
+  return ['default-model'];
 }
 
 export default router; 

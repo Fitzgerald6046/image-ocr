@@ -73,7 +73,7 @@ const getModelMetadata = (modelName: string, providerId: string): Partial<ModelI
   return { category, performance, cost, specialty };
 };
 
-// 从localStorage获取用户配置的模型列表
+// 从localStorage获取用户配置的模型列表（只显示已选模型）
 const getAvailableModels = (): ModelInfo[] => {
   try {
     const savedProviders = localStorage.getItem('aiProviders');
@@ -82,23 +82,25 @@ const getAvailableModels = (): ModelInfo[] => {
       const availableModels: ModelInfo[] = [];
       
       providers.forEach((provider: any) => {
-        // 只包含已配置API密钥的提供商的模型
+        // 只包含已配置API密钥的提供商的已选模型
         if (provider.apiKey && provider.apiKey.trim()) {
-          // 添加内置模型
-          provider.models.forEach((model: string) => {
-            const metadata = getModelMetadata(model, provider.id);
-            availableModels.push({
-              value: `${provider.id}::${model}`,
-              label: `${model} (${provider.name})`,
-              providerId: provider.id,
-              providerName: provider.name,
-              icon: provider.icon || '🤖',
-              ...metadata
+          // 添加已选模型
+          if (provider.selectedModels && provider.selectedModels.length > 0) {
+            provider.selectedModels.forEach((model: string) => {
+              const metadata = getModelMetadata(model, provider.id);
+              availableModels.push({
+                value: `${provider.id}::${model}`,
+                label: `${model} (${provider.name})`,
+                providerId: provider.id,
+                providerName: provider.name,
+                icon: provider.icon || '🤖',
+                ...metadata
+              });
             });
-          });
+          }
           
-          // 添加自定义模型
-          if (provider.customModels) {
+          // 添加自定义模型（保留兼容性）
+          if (provider.customModels && provider.customModels.length > 0) {
             provider.customModels.forEach((model: string) => {
               const metadata = getModelMetadata(model, provider.id);
               availableModels.push({

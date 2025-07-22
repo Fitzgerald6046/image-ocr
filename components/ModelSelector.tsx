@@ -25,44 +25,35 @@ const getHiddenModels = (): string[] => {
   }
 };
 
-// 从localStorage获取用户配置的模型列表
+// 从localStorage获取用户配置的模型列表（只显示已选模型）
 const getAvailableModels = (): ModelInfo[] => {
   try {
     const savedProviders = localStorage.getItem('aiProviders');
     if (savedProviders) {
       const providers = JSON.parse(savedProviders);
-      const hiddenModels = getHiddenModels();
       const availableModels: ModelInfo[] = [];
       
       providers.forEach((provider: any) => {
-        // 只包含已配置API密钥的提供商的模型
+        // 只包含已配置API密钥的提供商的已选模型
         if (provider.apiKey && provider.apiKey.trim()) {
-          // 添加内置模型
-          provider.models.forEach((model: string) => {
-            const modelValue = `${provider.id}::${model}`;
-            
-            // 如果模型被隐藏，则跳过
-            if (hiddenModels.includes(modelValue)) {
-              return;
-            }
-            
-            availableModels.push({
-              value: modelValue,
-              label: `${model} (${provider.name})`,
-              providerId: provider.id,
-              providerName: provider.name
-            });
-          });
-          
-          // 添加自定义模型
-          if (provider.customModels) {
-            provider.customModels.forEach((model: string) => {
+          // 添加已选模型
+          if (provider.selectedModels && provider.selectedModels.length > 0) {
+            provider.selectedModels.forEach((model: string) => {
               const modelValue = `${provider.id}::${model}`;
               
-              // 如果模型被隐藏，则跳过
-              if (hiddenModels.includes(modelValue)) {
-                return;
-              }
+              availableModels.push({
+                value: modelValue,
+                label: `${model} (${provider.name})`,
+                providerId: provider.id,
+                providerName: provider.name
+              });
+            });
+          }
+          
+          // 添加自定义模型（保留兼容性）
+          if (provider.customModels && provider.customModels.length > 0) {
+            provider.customModels.forEach((model: string) => {
+              const modelValue = `${provider.id}::${model}`;
               
               availableModels.push({
                 value: modelValue,

@@ -392,7 +392,7 @@ function App() {
         continue;
       }
       
-      const allModels = [...(provider.models || []), ...(provider.customModels || [])];
+      const allModels = [...(provider.models || []), ...(provider.customModels || []), ...(provider.selectedModels || [])];
       console.log('提供商模型列表:', allModels);
       
       if (allModels.includes(targetModelName)) {

@@ -14,6 +14,8 @@ interface AIProvider {
   apiUrl: string;
   models: string[];
   customModels: string[];
+  selectedModels: string[]; // 已选择的模型列表
+  availableModels: string[]; // 从更新模型列表获取的可用模型
   expanded: boolean;
   testStatus: 'success' | 'error' | null;
 }
@@ -33,6 +35,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
         'gemini-2.5-pro-exp-03-25'
       ],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: true,
       testStatus: null
     },
@@ -50,6 +54,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
         'mistralai/mistral-7b-instruct:free'
       ],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -61,6 +67,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://api.deepseek.com/v1',
       models: ['deepseek-chat'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -72,6 +80,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://api.openai.com/v1',
       models: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -83,6 +93,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://hunyuan.tencentcloudapi.com',
       models: ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -94,6 +106,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://open.bigmodel.cn/api/paas/v4',
       models: ['glm-4-flash', 'glm-4-plus', 'glm-4v-plus', 'glm-4-air'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -105,6 +119,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://dashscope.aliyuncs.com/api/v1',
       models: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-vl-plus', 'qwen-vl-max'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -116,6 +132,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://aip.baidubce.com/rest/2.0/ocr/v1',
       models: ['general_basic', 'accurate_basic', 'general', 'accurate', 'handwriting'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     },
@@ -127,6 +145,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: 'https://api.anthropic.com/v1',
       models: ['claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022', 'claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'],
       customModels: [],
+      selectedModels: [],
+      availableModels: [],
       expanded: false,
       testStatus: null
     }
@@ -141,10 +161,12 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
     models: [] as string[]
   });
   const [newModel, setNewModel] = useState('');
+  const [selectedAvailableModel, setSelectedAvailableModel] = useState<{[providerId: string]: string}>({});
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [testingModel, setTestingModel] = useState<string | null>(null);
   const [showModelSelector, setShowModelSelector] = useState<string | null>(null);
   const [updatingModels, setUpdatingModels] = useState<string | null>(null);
+  const [modelTestResults, setModelTestResults] = useState<{[key: string]: 'success' | 'error'}>({});
 
   // 从localStorage加载配置
   useEffect(() => {
@@ -154,7 +176,15 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       try {
         const savedProviders: AIProvider[] = JSON.parse(saved);
         console.log('📖 解析的配置数据:', savedProviders);
-        setProviders(savedProviders);
+        
+        // 兼容旧数据格式，为没有新字段的provider添加默认值
+        const updatedProviders = savedProviders.map(provider => ({
+          ...provider,
+          selectedModels: provider.selectedModels || [],
+          availableModels: provider.availableModels || []
+        }));
+        
+        setProviders(updatedProviders);
       } catch (error) {
         console.error('❌ 从localStorage加载配置失败:', error);
       }
@@ -252,7 +282,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       return;
     }
     
-    const availableModels = [...provider.models, ...provider.customModels];
+    const availableModels = [...provider.models, ...provider.customModels, ...provider.selectedModels];
     const modelToTest = selectedModel || availableModels[0] || `${provider.id}-test`;
     
     if (!selectedModel && availableModels.length > 1) {
@@ -284,6 +314,13 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       const result = await response.json();
       console.log('🧪 测试结果:', result);
       
+      // 保存模型测试结果
+      const modelKey = `${providerId}::${modelToTest}`;
+      setModelTestResults(prev => ({
+        ...prev,
+        [modelKey]: result.success ? 'success' : 'error'
+      }));
+      
       setProviders(prev => prev.map(p => 
         p.id === providerId 
           ? { ...p, testStatus: result.success ? 'success' : 'error' }
@@ -298,6 +335,14 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       
     } catch (error) {
       console.error('❌ 测试连接失败:', error);
+      
+      // 保存模型测试失败结果
+      const modelKey = `${providerId}::${modelToTest}`;
+      setModelTestResults(prev => ({
+        ...prev,
+        [modelKey]: 'error'
+      }));
+      
       setProviders(prev => prev.map(p => 
         p.id === providerId 
           ? { ...p, testStatus: 'error' }
@@ -315,7 +360,7 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
     const provider = providers.find(p => p.id === providerId);
     if (!provider) return null;
     
-    const availableModels = [...provider.models, ...provider.customModels];
+    const availableModels = [...provider.models, ...provider.customModels, ...provider.selectedModels];
     
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -359,6 +404,8 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       apiUrl: newProvider.apiUrl,
       models: [],
       customModels: newProvider.models,
+      selectedModels: [],
+      availableModels: [],
       expanded: true,
       testStatus: null
     };
@@ -404,10 +451,10 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
       console.log('📋 模型列表结果:', result);
       
       if (result.success && result.models) {
-        // 更新模型列表，保留现有自定义模型
+        // 将获取的模型添加到availableModels中
         setProviders(prev => prev.map(p => 
           p.id === providerId 
-            ? { ...p, models: result.models }
+            ? { ...p, availableModels: result.models }
             : p
         ));
         alert(`成功更新模型列表！发现 ${result.models.length} 个模型`);
@@ -461,12 +508,50 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
   };
 
   // 清除所有模型
+  // 从可用模型下拉框添加到已选模型
+  const addToSelectedModels = (providerId: string) => {
+    const selectedModel = selectedAvailableModel[providerId];
+    if (!selectedModel) {
+      alert('请先选择一个模型');
+      return;
+    }
+    
+    const provider = providers.find(p => p.id === providerId);
+    if (provider && provider.selectedModels.includes(selectedModel)) {
+      alert('该模型已在已选模型列表中');
+      return;
+    }
+    
+    setProviders(prev => prev.map(p => 
+      p.id === providerId 
+        ? { ...p, selectedModels: [...p.selectedModels, selectedModel] }
+        : p
+    ));
+    
+    // 清空选择
+    setSelectedAvailableModel(prev => ({
+      ...prev,
+      [providerId]: ''
+    }));
+    
+    alert(`模型 "${selectedModel}" 已添加到已选模型`);
+  };
+
+  // 从已选模型中删除
+  const removeFromSelectedModels = (providerId: string, modelIndex: number) => {
+    setProviders(prev => prev.map(p => 
+      p.id === providerId 
+        ? { ...p, selectedModels: p.selectedModels.filter((_, i) => i !== modelIndex) }
+        : p
+    ));
+  };
+
   const clearAllModels = (providerId: string) => {
-    if (confirm('确定要清除此提供商的所有模型吗？此操作不可撤销。')) {
+    if (confirm('确定要清除此提供商的所有可用模型吗？此操作不可撤销。')) {
       setProviders(prev => prev.map(p => 
-        p.id === providerId ? { ...p, models: [] } : p
+        p.id === providerId ? { ...p, availableModels: [] } : p
       ));
-      alert('所有模型已清除');
+      alert('所有可用模型已清除');
     }
   };
 
@@ -639,67 +724,114 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
                       </div>
                     </div>
 
+                    {/* 可用模型下拉框选择区域 */}
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-2">
                         <label className="block text-sm font-medium text-gray-700">
-                          可用模型
+                          可用模型选择
                         </label>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => clearAllModels(provider.id)}
-                            className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
-                            title="清除所有模型"
-                          >
-                            清除全部
-                          </button>
-                          <button
-                            onClick={() => restoreHiddenModels(provider.id)}
-                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 transition-colors"
-                            title="恢复隐藏的模型"
-                          >
-                            恢复隐藏
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => clearAllModels(provider.id)}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition-colors"
+                          title="清除所有可用模型"
+                        >
+                          清除全部
+                        </button>
                       </div>
                       
-                      {(() => {
-                        const hiddenModels = getHiddenModels();
-                        const visibleModels = provider.models.filter(model => 
-                          !hiddenModels.includes(`${provider.id}::${model}`)
-                        );
-                        const hiddenCount = provider.models.length - visibleModels.length;
-                        
-                        return (
-                          <>
-                            {hiddenCount > 0 && (
-                              <div className="mb-2 p-2 bg-yellow-50 text-yellow-700 rounded text-xs">
-                                已隐藏 {hiddenCount} 个模型，点击"恢复隐藏"可重新显示
+                      {provider.availableModels.length > 0 ? (
+                        <div className="flex gap-2">
+                          <select
+                            value={selectedAvailableModel[provider.id] || ''}
+                            onChange={(e) => setSelectedAvailableModel(prev => ({
+                              ...prev,
+                              [provider.id]: e.target.value
+                            }))}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="">请选择模型</option>
+                            {provider.availableModels.map((model) => (
+                              <option key={model} value={model}>
+                                {model}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => addToSelectedModels(provider.id)}
+                            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            添加
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-gray-500 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                          暂无可用模型，请点击右上角的更新按钮获取模型列表
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 已选模型列表 */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          已选模型
+                        </label>
+                      </div>
+                      
+                      {provider.selectedModels.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500 bg-gray-50 rounded border-2 border-dashed border-gray-200">
+                          暂无已选模型，请从上方可用模型中选择添加
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {provider.selectedModels.map((model, index) => (
+                            <div key={index} className="flex items-center justify-between px-4 py-3 bg-green-50 text-green-700 rounded-lg border border-green-200">
+                              <span className="flex-1 truncate font-medium">{model}</span>
+                              <div className="flex items-center gap-3">
+                                {/* 测试成功标志 */}
+                                {(() => {
+                                  const modelKey = `${provider.id}::${model}`;
+                                  const testResult = modelTestResults[modelKey];
+                                  if (testResult === 'success') {
+                                    return (
+                                      <span className="text-green-600 text-xl font-bold" title="测试成功">
+                                        ✓
+                                      </span>
+                                    );
+                                  } else if (testResult === 'error') {
+                                    return (
+                                      <span className="text-red-600 text-xl font-bold" title="测试失败">
+                                        ✗
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                                
+                                {/* 测试按钮 - 更大 */}
+                                <button
+                                  onClick={() => testConnection(provider.id, model)}
+                                  disabled={testingProvider === provider.id}
+                                  className="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50 font-medium"
+                                  title="测试此模型连接"
+                                >
+                                  {testingProvider === provider.id && testingModel === model ? '测试中...' : '测试'}
+                                </button>
+                                
+                                {/* 删除按钮 - 更大 */}
+                                <button
+                                  onClick={() => removeFromSelectedModels(provider.id, index)}
+                                  className="p-2 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg"
+                                  title="删除此模型"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
                               </div>
-                            )}
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {visibleModels.length === 0 ? (
-                                <div className="col-span-full p-4 text-center text-gray-500 bg-gray-50 rounded">
-                                  暂无可见模型，请更新模型列表或恢复隐藏的模型
-                                </div>
-                              ) : (
-                                visibleModels.map((model) => (
-                                  <div key={model} className="flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-700 rounded text-sm">
-                                    <span className="flex-1 truncate">{model}</span>
-                                    <button
-                                      onClick={() => hideModel(provider.id, model)}
-                                      className="ml-2 p-1 text-red-400 hover:text-red-600 hover:bg-red-100 rounded"
-                                      title="隐藏此模型"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ))
-                              )}
                             </div>
-                          </>
-                        );
-                      })()}
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {provider.customModels.length > 0 && (
@@ -709,14 +841,48 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ onBack }) => {
                         </label>
                         <div className="space-y-2">
                           {provider.customModels.map((model, index) => (
-                            <div key={index} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded">
-                              <span className="text-sm">{model}</span>
-                              <button
-                                onClick={() => removeCustomModel(provider.id, index)}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                            <div key={index} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded border border-gray-200">
+                              <span className="text-sm font-medium">{model}</span>
+                              <div className="flex items-center gap-2">
+                                {/* 测试成功标志 */}
+                                {(() => {
+                                  const modelKey = `${provider.id}::${model}`;
+                                  const testResult = modelTestResults[modelKey];
+                                  if (testResult === 'success') {
+                                    return (
+                                      <span className="text-green-600 text-lg font-bold" title="测试成功">
+                                        ✓
+                                      </span>
+                                    );
+                                  } else if (testResult === 'error') {
+                                    return (
+                                      <span className="text-red-600 text-lg font-bold" title="测试失败">
+                                        ✗
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                                
+                                {/* 测试按钮 */}
+                                <button
+                                  onClick={() => testConnection(provider.id, model)}
+                                  disabled={testingProvider === provider.id}
+                                  className="px-3 py-1.5 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:opacity-50 font-medium"
+                                  title="测试此模型连接"
+                                >
+                                  {testingProvider === provider.id && testingModel === model ? '测试中...' : '测试'}
+                                </button>
+                                
+                                {/* 删除按钮 */}
+                                <button
+                                  onClick={() => removeCustomModel(provider.id, index)}
+                                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                                  title="删除此模型"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
