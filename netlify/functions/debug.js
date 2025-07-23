@@ -38,7 +38,23 @@ export const handler = async (event, context) => {
         env: {
           NODE_ENV: process.env.NODE_ENV,
           NETLIFY: process.env.NETLIFY,
-          NETLIFY_DEV: process.env.NETLIFY_DEV
+          NETLIFY_DEV: process.env.NETLIFY_DEV,
+          CONTEXT: process.env.CONTEXT,
+          DEPLOY_URL: process.env.DEPLOY_URL,
+          // 代理相关环境变量检查
+          HTTP_PROXY: process.env.HTTP_PROXY || 'undefined',
+          HTTPS_PROXY: process.env.HTTPS_PROXY || 'undefined',
+          NO_PROXY: process.env.NO_PROXY || 'undefined'
+        },
+        // 代理检查结果
+        proxyStatus: {
+          hasHttpProxy: !!process.env.HTTP_PROXY,
+          hasHttpsProxy: !!process.env.HTTPS_PROXY,
+          shouldUseProxy: !!(process.env.HTTP_PROXY || process.env.HTTPS_PROXY) && 
+                         !process.env.NETLIFY && 
+                         !process.env.CONTEXT && 
+                         !process.env.DEPLOY_URL,
+          isNetlifyEnv: !!(process.env.NETLIFY || process.env.CONTEXT || process.env.DEPLOY_URL || process.env.NETLIFY_DEV)
         }
       },
       availableFunctions: [

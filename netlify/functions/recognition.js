@@ -1,5 +1,23 @@
 import axios from 'axios';
 
+// 创建专用的axios实例，确保在Netlify环境中不使用代理
+const createAxiosInstance = () => {
+  const config = {
+    timeout: 60000, // 60秒超时
+    maxRedirects: 5
+  };
+  
+  // 在Netlify环境中明确禁用代理
+  if (process.env.NETLIFY || process.env.CONTEXT || process.env.DEPLOY_URL || process.env.NETLIFY_DEV) {
+    config.proxy = false;
+    console.log('🚫 Netlify environment detected - all proxy disabled');
+  }
+  
+  return axios.create(config);
+};
+
+const axiosInstance = createAxiosInstance();
+
 // 识别类型和对应的提示词
 const RECOGNITION_PROMPTS = {
   auto: '请分析这张图片，自动识别其类型（如文档、收据、古籍、证件等），并提取相关信息。',
@@ -147,7 +165,7 @@ async function recognizeWithGemini(imageUrl, modelConfig, prompt) {
     ]
   };
 
-  const response = await axios.post(
+  const response = await axiosInstance.post(
     `${apiUrl}/models/${model}:generateContent?key=${apiKey}`,
     requestBody,
     {
@@ -186,7 +204,7 @@ async function recognizeWithOpenAI(imageUrl, modelConfig, prompt) {
     max_tokens: 2000
   };
 
-  const response = await axios.post(
+  const response = await axiosInstance.post(
     `${apiUrl}/chat/completions`,
     requestBody,
     {
@@ -225,7 +243,7 @@ async function recognizeWithDeepSeek(imageUrl, modelConfig, prompt) {
     ]
   };
 
-  const response = await axios.post(
+  const response = await axiosInstance.post(
     `${apiUrl}/chat/completions`,
     requestBody,
     {
@@ -275,7 +293,7 @@ async function recognizeWithClaude(imageUrl, modelConfig, prompt) {
     ]
   };
 
-  const response = await axios.post(
+  const response = await axiosInstance.post(
     `${apiUrl}/messages`,
     requestBody,
     {
@@ -316,7 +334,7 @@ async function recognizeWithGeneric(imageUrl, modelConfig, prompt) {
     max_tokens: 2000
   };
 
-  const response = await axios.post(
+  const response = await axiosInstance.post(
     `${apiUrl}/chat/completions`,
     requestBody,
     {
@@ -340,7 +358,20 @@ async function recognizeWithGeneric(imageUrl, modelConfig, prompt) {
 
 // 下载图片并转换为base64
 async function downloadImageAsBase64(imageUrl) {
-  const response = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+  // 确保在Netlify环境中不使用代理
+  const config = {
+    responseType: 'arraybuffer',
+    timeout: 30000,
+    maxRedirects: 5
+  };
+  
+  // 明确禁用代理（Netlify Functions应直接连接）
+  if (process.env.NETLIFY || process.env.CONTEXT || process.env.DEPLOY_URL) {
+    config.proxy = false;
+    console.log('🚫 Netlify environment - proxy disabled for image download');
+  }
+  
+  const response = await axiosInstance.get(imageUrl, config);
   const base64 = Buffer.from(response.data).toString('base64');
   return base64;
 }

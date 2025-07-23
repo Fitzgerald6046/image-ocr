@@ -24,14 +24,22 @@ class ProxyConfig {
    * Get proxy configuration for HTTP requests
    */
   getProxyConfig() {
-    // Production or Netlify - no proxy
+    // Production or Netlify - NEVER use proxy
     if (this.isProduction || this.isNetlify) {
+      console.log('🚫 Production/Netlify environment detected - proxy disabled');
       return null;
     }
 
-    // WSL development - use local proxy
-    if (this.isWSL) {
-      const proxyUrl = process.env.HTTP_PROXY || process.env.HTTPS_PROXY || 'http://127.0.0.1:7890';
+    // Check for Netlify-specific environment variables
+    if (process.env.NETLIFY_DEV || process.env.CONTEXT || process.env.DEPLOY_URL) {
+      console.log('🚫 Netlify deployment environment detected - proxy disabled');
+      return null;
+    }
+
+    // WSL development - use local proxy only if explicitly set
+    if (this.isWSL && (process.env.HTTP_PROXY || process.env.HTTPS_PROXY)) {
+      const proxyUrl = process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+      console.log('🔗 WSL development proxy enabled:', proxyUrl);
       return {
         proxy: proxyUrl,
         agent: new HttpsProxyAgent(proxyUrl)
@@ -41,6 +49,7 @@ class ProxyConfig {
     // Local development - check for explicit proxy settings
     if (process.env.HTTP_PROXY || process.env.HTTPS_PROXY) {
       const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+      console.log('🔗 Local development proxy enabled:', proxyUrl);
       return {
         proxy: proxyUrl,
         agent: new HttpsProxyAgent(proxyUrl)
@@ -48,6 +57,7 @@ class ProxyConfig {
     }
 
     // Default - no proxy
+    console.log('✅ No proxy configuration - direct connection');
     return null;
   }
 

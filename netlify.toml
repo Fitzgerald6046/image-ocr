@@ -131,16 +131,25 @@
 [context.production.environment]
   NODE_ENV = "production"
   NETLIFY = "true"
+  # 明确禁用代理
+  HTTP_PROXY = ""
+  HTTPS_PROXY = ""
 
 # 预览环境配置
 [context.deploy-preview.environment]
   NODE_ENV = "production"
   NETLIFY = "true"
+  # 明确禁用代理
+  HTTP_PROXY = ""
+  HTTPS_PROXY = ""
 
 # 分支部署配置
 [context.branch-deploy.environment]
   NODE_ENV = "production"
   NETLIFY = "true"
+  # 明确禁用代理
+  HTTP_PROXY = ""
+  HTTPS_PROXY = ""
 
 # 缓存设置
 [[headers]]
