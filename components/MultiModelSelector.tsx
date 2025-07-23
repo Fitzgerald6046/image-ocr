@@ -407,10 +407,11 @@ const MultiModelSelector: React.FC<MultiModelSelectorProps> = ({
         <div className="flex items-center justify-between">
           <button
             onClick={onConfigureModels}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors duration-200 flex items-center gap-2 font-medium"
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 active:bg-orange-700 transition-colors duration-200 flex items-center gap-2 font-medium shadow-md border border-orange-600"
+            style={{ backgroundColor: '#f97316', color: '#ffffff' }}
           >
             <Settings className="w-4 h-4" />
-            <span>模型配置</span>
+            <span>🔧 模型配置</span>
           </button>
 
           {selectedModels.length > 0 && (

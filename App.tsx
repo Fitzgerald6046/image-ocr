@@ -671,6 +671,7 @@ function App() {
                 uploadedImage={uploadedImage}
                 recognitionType={recognitionType}
                 onConfigureModels={() => setCurrentView('settings')}
+                onImageUpload={handleImageUpload}
               />
             </div>
           </div>
@@ -732,9 +733,10 @@ function App() {
               <button
                 onClick={() => setCurrentView('comparison')}
                 className="flex items-center gap-2 px-3 py-2 text-sm bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors"
+                title="多模型对比分析"
               >
                 <BarChart3 className="w-4 h-4" />
-                <span className="hidden sm:inline">模型对比</span>
+                <span className="hidden md:inline">模型对比</span>
               </button>
               
               <button
@@ -882,6 +884,42 @@ function App() {
                 )}
               </div>
             </div>
+
+            {/* 功能介绍卡片 */}
+            {!showBatchSection && (
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-lg border border-indigo-200 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-indigo-800">多模型对比分析</h3>
+                </div>
+                <p className="text-indigo-700 mb-4">
+                  同时使用多个AI模型识别图片，比较不同模型的准确率、速度和识别结果，帮助您选择最适合的模型。
+                </p>
+                <div className="flex flex-col gap-2 mb-4 text-sm text-indigo-600">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                    <span>支持同时对比2-5个模型</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                    <span>实时显示速度和准确率统计</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                    <span>智能推荐最佳模型</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentView('comparison')}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  开始多模型对比分析
+                </button>
+              </div>
+            )}
             
             {/* 批量处理区域 */}
             {showBatchSection && (

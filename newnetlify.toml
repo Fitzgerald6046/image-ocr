@@ -1,0 +1,23 @@
+# netlify.toml
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_ENV = "production"
+  # 确保不设置任何代理相关的环境变量
+
+[context.production.environment]
+  NODE_ENV = "production"
+
+# 如果您的后端是 Netlify Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# 设置单页应用的重定向
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

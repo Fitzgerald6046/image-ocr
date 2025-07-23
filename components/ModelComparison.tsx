@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Download, Eye, Loader2, Clock, Award, TrendingUp, AlertCircle } from 'lucide-react';
+import { Play, Pause, RotateCcw, Download, Eye, Loader2, Clock, Award, TrendingUp, AlertCircle, Upload } from 'lucide-react';
 import { ErrorHandler, ApiError } from '../utils/errorHandler';
 import ErrorMessage from './ErrorMessage';
 import MultiModelSelector from './MultiModelSelector';
+import ImageUpload from './ImageUpload';
 import { getApiUrl, API_CONFIG } from '../src/config';
 
 interface ModelComparisonProps {
@@ -14,6 +15,7 @@ interface ModelComparisonProps {
   } | null;
   recognitionType: string;
   onConfigureModels: () => void;
+  onImageUpload?: (file: File) => void; // 添加图片上传回调
 }
 
 interface ComparisonResult {
@@ -46,7 +48,8 @@ interface PerformanceStats {
 const ModelComparison: React.FC<ModelComparisonProps> = ({
   uploadedImage,
   recognitionType,
-  onConfigureModels
+  onConfigureModels,
+  onImageUpload
 }) => {
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [isComparing, setIsComparing] = useState(false);
@@ -310,6 +313,111 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* 使用说明 */}
+      {(!uploadedImage || selectedModels.length === 0) && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-blue-800 mb-3">
+            📊 多模型对比分析使用指南
+          </h3>
+          <div className="space-y-2 text-sm text-blue-700">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+              <span>上传要识别的图片</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+              <span>选择2-5个不同的AI模型进行对比</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">3</span>
+              <span>点击"开始对比"按钮执行批量识别</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold">4</span>
+              <span>查看不同模型的识别结果、速度和准确率对比</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 图片上传区域 */}
+      {!uploadedImage && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <Upload className="w-5 h-5 text-blue-600" />
+              <h3 className="text-lg font-semibold text-gray-800">上传图片</h3>
+            </div>
+          </div>
+          <div className="p-6">
+            {onImageUpload ? (
+              <ImageUpload onImageUpload={onImageUpload} />
+            ) : (
+              <div className="text-center p-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <p className="text-gray-500 mb-2">请先返回主页上传图片</p>
+                <p className="text-sm text-gray-400">或在设置中启用直接上传功能</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 已上传图片的预览 */}
+      {uploadedImage && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-green-100 rounded flex items-center justify-center">
+                  <span className="text-green-600 text-xs">🖼️</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800">已上传图片</h3>
+              </div>
+              {onImageUpload && (
+                <button
+                  onClick={() => {
+                    // 重新上传
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        onImageUpload(file);
+                      }
+                    };
+                    input.click();
+                  }}
+                  className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+                >
+                  重新上传
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <img
+                src={uploadedImage.url}
+                alt="预览图片"
+                className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+              />
+              <div className="flex-1">
+                <p className="font-medium text-gray-800">{uploadedImage.file.name}</p>
+                <p className="text-sm text-gray-500">
+                  {(uploadedImage.file.size / 1024 / 1024).toFixed(2)} MB · {uploadedImage.file.type}
+                </p>
+                {uploadedImage.metadata && (
+                  <p className="text-sm text-gray-500">
+                    {uploadedImage.metadata.width} × {uploadedImage.metadata.height} 像素
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 模型选择器 */}
       <MultiModelSelector
         selectedModels={selectedModels}
@@ -319,22 +427,63 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
         comparisonMode={true}
       />
 
+      {/* 调试信息 - 显示识别按钮状态 */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+        <h4 className="text-sm font-medium text-gray-600 mb-2">🔍 调试信息</h4>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-gray-600">已选择模型数量: </span>
+            <span className={selectedModels.length > 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+              {selectedModels.length}
+            </span>
+          </div>
+          <div>
+            <span className="text-gray-600">图片已上传: </span>
+            <span className={uploadedImage ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+              {uploadedImage ? '是' : '否'}
+            </span>
+          </div>
+          <div className="col-span-2">
+            <span className="text-gray-600">识别按钮状态: </span>
+            <span className={(selectedModels.length > 0 && uploadedImage) ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+              {(selectedModels.length > 0 && uploadedImage) ? '✅ 应该显示' : '❌ 未满足显示条件'}
+            </span>
+          </div>
+        </div>
+        {selectedModels.length > 0 && (
+          <div className="mt-2">
+            <span className="text-gray-600 text-xs">已选择的模型: </span>
+            <span className="text-blue-600 text-xs">{selectedModels.join(', ')}</span>
+          </div>
+        )}
+      </div>
+
       {/* 控制按钮 */}
       {selectedModels.length > 0 && uploadedImage && (
         <div className="flex items-center gap-3">
           <button
             onClick={startComparison}
             disabled={isComparing}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+            style={{ 
+              backgroundColor: '#2563eb', 
+              color: '#ffffff',
+              border: '2px solid #1d4ed8'
+            }}
           >
             {isComparing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
-            {isComparing ? '对比进行中...' : '开始对比'}
+            {isComparing ? '对比进行中...' : '🚀 开始对比'}
           </button>
 
           {isComparing && (
             <button
               onClick={togglePause}
-              className="flex items-center gap-2 px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-3 rounded-lg transition-colors"
+              style={{ 
+                backgroundColor: '#d97706', 
+                color: '#ffffff',
+                border: '2px solid #b45309'
+              }}
             >
               {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
               {isPaused ? '继续' : '暂停'}
@@ -343,7 +492,12 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
 
           <button
             onClick={resetComparison}
-            className="flex items-center gap-2 px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-3 rounded-lg transition-colors"
+            style={{ 
+              backgroundColor: '#4b5563', 
+              color: '#ffffff',
+              border: '2px solid #374151'
+            }}
           >
             <RotateCcw className="w-5 h-5" />
             重置
@@ -352,7 +506,12 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
           {results.some(r => r.status === 'completed') && (
             <button
               onClick={exportResults}
-              className="flex items-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-3 rounded-lg transition-colors"
+              style={{ 
+                backgroundColor: '#059669', 
+                color: '#ffffff',
+                border: '2px solid #047857'
+              }}
             >
               <Download className="w-5 h-5" />
               导出结果
@@ -360,6 +519,8 @@ const ModelComparison: React.FC<ModelComparisonProps> = ({
           )}
         </div>
       )}
+
+
 
       {/* 错误信息 */}
       {error && (

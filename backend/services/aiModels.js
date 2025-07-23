@@ -279,6 +279,11 @@ class AIModelService {
       return 'openai';
     }
     
+    if (apiUrl.includes('anthropic.com')) {
+      console.log('🔍 检测到Claude API URL，使用claude提供商');
+      return 'claude';
+    }
+    
     // 对于自定义中转API，尝试检测API格式
     console.log('🔍 检测到自定义API URL，分析API格式...');
     
@@ -730,13 +735,15 @@ class AIModelService {
           testUrl = `${config.apiUrl}/models`;
         }
         headers = { 'Authorization': `Bearer ${config.apiKey}` };
-      } else if (config.apiUrl.includes('openai.com')) {
-        providerId = 'openai';
-        // 对于OpenAI，如果API URL不包含具体端点，添加/models
-        if (!config.apiUrl.includes('/models') && !config.apiUrl.includes('/chat/completions')) {
-          testUrl = `${config.apiUrl}/models`;
-        }
-        headers = { 'Authorization': `Bearer ${config.apiKey}` };
+      } else if (config.apiUrl.includes('anthropic.com')) {
+        providerId = 'claude';
+        // 对于Claude，使用简单的连接测试，因为Claude API需要POST请求
+        // 我们只测试网络连通性，不测试具体的API端点
+        testUrl = config.apiUrl.replace('/messages', ''); // 移除messages端点进行连通性测试
+        headers = { 
+          'x-api-key': config.apiKey,
+          'anthropic-version': '2023-06-01'
+        };
       } else {
         // 对于自定义提供商，直接使用用户提供的完整URL
         // 不添加任何端点，让用户指定完整的测试URL

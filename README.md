@@ -57,6 +57,20 @@ npm run dev
 
 应用将在 http://localhost:3000 启动
 
+### 终止程序运行
+
+如需停止前端和后端程序，请参考：
+- 📋 **[完整终止指南](./STOP-PROCESSES-GUIDE.md)** - 详细的终止方法和故障排除
+- 🚨 **[快速参考卡](./QUICK-STOP-REFERENCE.md)** - 紧急情况下的快速方法
+
+```bash
+# 推荐方法：使用项目自带清理脚本
+./cleanup.ps1
+
+# 或在运行的终端中按下
+Ctrl + C
+```
+
 ### 构建生产版本
 
 ```bash

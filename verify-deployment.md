@@ -76,3 +76,38 @@ console.log('API Base:', API_CONFIG.baseURL);
 git revert HEAD
 git push origin main
 ```
+ ✅ 修复已提交并推送！
+
+  主要修复内容：
+
+  1. 环境检测修复：使用hostname而不是process.env.NODE_ENV来检测生产环境     
+  2. 调试功能增强：添加了全局调试函数，可以在浏览器控制台使用
+  3. 控制台日志：添加了环境检测的控制台输出
+
+  📋 新的测试步骤
+
+  等Netlify重新部署后（约1-2分钟），请在浏览器控制台测试：
+
+  1. 检查配置
+
+  getDebugInfo()
+
+  2. 检查API配置
+
+  console.log('API Base URL:', API_CONFIG.baseURL);
+  console.log('Test API URL:', getApiUrl('/api/models/test'));
+
+  3. 验证环境检测
+
+  console.log('Hostname:', window.location.hostname);
+  console.log('Should be production:',
+    window.location.hostname !== 'localhost' &&
+    window.location.hostname !== '127.0.0.1'
+  );
+
+  期望结果：
+  - API_CONFIG.baseURL 应该是空字符串 ""
+  - API调用应该使用相对路径 /api/models/test
+  - 不应该再看到 127.0.0.1:7890
+
+  如果测试后仍有问题，请提供控制台的调试输出信息！
