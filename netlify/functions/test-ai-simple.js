@@ -24,7 +24,6 @@ export const handler = async (event, context) => {
     
     const { provider, apiKey, apiUrl, model } = JSON.parse(event.body);
     
-    console.log('Testing:', { provider, model, apiUrl: apiUrl ? 'present' : 'missing', apiKey: apiKey ? 'present' : 'missing' });
 
     let testResult;
 

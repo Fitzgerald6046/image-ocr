@@ -325,7 +325,6 @@ class AIModelService {
       console.log('🔗 Gemini API请求信息:');
       console.log('   请求URL:', apiUrl);
       console.log('   模型名称:', config.model);
-      console.log('   API Key前4位:', config.apiKey.substring(0, 4) + '***');
       console.log('   图片大小:', `${imageSizeKB.toFixed(1)}KB`);
       console.log('   表格识别:', isTableRecognition ? '是 (使用16384 tokens)' : '否');
       
@@ -769,14 +768,11 @@ class AIModelService {
             return { success: true, message: '连接成功 (Bearer Token)' };
           }
         } catch (bearerError) {
-          console.log('🔄 Bearer token认证失败，尝试API Key认证...');
           
           // 尝试API Key方式
           headers = { 'x-api-key': config.apiKey };
           
           try {
-            console.log('🔗 测试URL (API Key):', testUrl);
-            console.log('🔑 测试Headers (API Key):', headers);
             
             const response = await axios.get(testUrl, {
               headers,
@@ -785,11 +781,9 @@ class AIModelService {
             });
             
             if (response.status === 200 || response.status === 403) {
-              console.log('✅ API Key认证成功，状态:', response.status);
               return { success: true, message: '连接成功 (API Key)' };
             }
           } catch (apikeyError) {
-            console.log('🔄 x-api-key认证失败，尝试x-goog-api-key...');
             
             // 尝试Google风格的API Key
             headers = { 'x-goog-api-key': config.apiKey };
@@ -802,7 +796,6 @@ class AIModelService {
               });
               
               if (response.status === 200 || response.status === 403) {
-                console.log('✅ Google API Key认证成功，状态:', response.status);
                 return { success: true, message: '连接成功 (Google API Key)' };
               }
             } catch (googleError) {
@@ -1160,7 +1153,6 @@ class AIModelService {
           if (Object.keys(headers).length === 0) {
             const separator = apiUrl.includes('?') ? '&' : '?';
             requestUrl = `${apiUrl}${separator}api_key=${encodeURIComponent(config.apiKey)}`;
-            console.log(`🔗 使用URL参数认证: ${requestUrl.replace(config.apiKey, '***')}`);
           }
           
           console.log('🚀 发送请求:');

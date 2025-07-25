@@ -30,7 +30,6 @@ export const handler = async (event, context) => {
     console.log('Provider:', provider);
     console.log('Model:', model);
     console.log('API URL:', apiUrl);
-    console.log('Has API Key:', !!apiKey);
     console.log('Image URL:', imageUrl);
 
     let result;

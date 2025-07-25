@@ -3,15 +3,61 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
 import aiModelService from '../services/aiModels.js';
+import InputValidator from '../utils/inputValidator.js';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 图片识别端点
+// 图片识别端点 - 增强安全验证
 router.post('/', async (req, res) => {
   try {
+    // 验证请求
+    const validation = InputValidator.validateRequest(req, {
+      requireJson: true,
+      checkOrigin: process.env.NODE_ENV === 'production'
+    });
+    
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: 'INVALID_REQUEST',
+        message: `请求验证失败: ${validation.errors.join(', ')}`
+      });
+    }
+
     const { fileId, modelConfig, recognitionType = 'auto' } = req.body;
+    
+    // 验证必需参数
+    if (!fileId || !modelConfig) {
+      return res.status(400).json({
+        error: 'MISSING_PARAMETERS',
+        message: '缺少必需参数: fileId 和 modelConfig'
+      });
+    }
+
+    // 验证fileId格式
+    if (!InputValidator.validateFileId(fileId)) {
+      return res.status(400).json({
+        error: 'INVALID_FILE_ID',
+        message: '无效的文件ID格式'
+      });
+    }
+
+    // 验证识别类型
+    if (!InputValidator.validateRecognitionType(recognitionType)) {
+      return res.status(400).json({
+        error: 'INVALID_RECOGNITION_TYPE',
+        message: `不支持的识别类型: ${recognitionType}`
+      });
+    }
+
+    // 验证模型配置
+    if (!InputValidator.validateProvider(modelConfig.provider)) {
+      return res.status(400).json({
+        error: 'INVALID_PROVIDER',
+        message: `不支持的AI提供商: ${modelConfig.provider}`
+      });
+    }
 
     // 验证必要参数
     if (!fileId) {

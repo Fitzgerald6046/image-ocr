@@ -12,6 +12,32 @@ dist
 dist-ssr
 *.local
 
+# Security - API Keys and sensitive data
+.keys.json
+.env.local
+.env.production
+backend/.keys.json
+
+# Uploads directory - ignore all files but keep directory structure
+backend/uploads/*
+!**/.gitkeep
+# Alternative specific ignores
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.bmp
+*.tiff
+# But only in uploads directory specifically
+backend/uploads/*.jpg
+backend/uploads/*.jpeg
+backend/uploads/*.png
+backend/uploads/*.gif
+backend/uploads/*.webp
+backend/uploads/*.bmp
+backend/uploads/*.tiff
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
