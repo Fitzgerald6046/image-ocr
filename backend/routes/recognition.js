@@ -92,17 +92,36 @@ router.post('/', async (req, res) => {
     console.log(`📋 识别类型: ${recognitionType}`);
     console.log(`🤖 使用模型: ${modelConfig.model}`);
 
-    // 调用AI模型进行识别
-    const recognition = await aiModelService.recognizeImage(
-      imagePath, 
-      modelConfig, 
-      recognitionType
-    );
+    // 添加超时保护
+    const RECOGNITION_TIMEOUT = 90000; // 90秒超时
+    console.log('🚀 开始AI识别，超时时间:', RECOGNITION_TIMEOUT / 1000, '秒');
+    
+    // 调用AI模型进行识别，包含超时控制
+    const recognition = await Promise.race([
+      aiModelService.recognizeImage(
+        imagePath, 
+        modelConfig, 
+        recognitionType
+      ),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('识别请求超时，请检查网络连接或稍后重试')), RECOGNITION_TIMEOUT)
+      )
+    ]);
+
+    // 详细记录识别结果用于调试
+    console.log('🔍 AI模型服务返回的完整结果:');
+    console.log('   success:', recognition.success);
+    console.log('   result存在:', !!recognition.result);
+    if (recognition.result) {
+      console.log('   content长度:', recognition.result.content?.length || 0);
+      console.log('   content前200字符:', recognition.result.content?.substring(0, 200) || 'empty');
+      console.log('   confidence:', recognition.result.confidence);
+    }
 
     // 记录识别日志
-    console.log(`✅ 识别完成: ${imageFile} - ${recognition.result.confidence * 100}%`);
+    console.log(`✅ 识别完成: ${imageFile} - ${(recognition.result.confidence * 100).toFixed(1)}%`);
 
-    res.json({
+    const response = {
       success: true,
       recognition: recognition.result,
       file: {
@@ -110,16 +129,60 @@ router.post('/', async (req, res) => {
         name: imageFile,
         url: `/uploads/${imageFile}`
       }
-    });
+    };
+
+    console.log('📤 准备发送给前端的响应:');
+    console.log('   success:', response.success);
+    console.log('   recognition存在:', !!response.recognition);
+    console.log('   recognition.content长度:', response.recognition?.content?.length || 0);
+
+    // 设置CORS和响应头
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');  
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Content-Type', 'application/json');
+
+    const jsonResponse = JSON.stringify(response);
+    console.log('📤 JSON响应长度:', jsonResponse.length);
+    console.log('📤 JSON响应前500字符:', jsonResponse.substring(0, 500));
+
+    res.json(response);
+    
+    console.log('📤 响应已发送');
 
   } catch (error) {
-    console.error('Recognition error:', error);
+    console.error('❌ Recognition route error:', error);
+    console.error('❌ Error type:', typeof error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
     
-    res.status(500).json({
+    // 检查是否是API调用错误还是其他错误
+    if (error.response) {
+      console.error('❌ API响应错误:', error.response.status, error.response.data);
+    }
+    
+    const errorResponse = {
       error: 'Recognition failed',
       message: error.message || '图片识别失败',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+      code: error.code || 'RECOGNITION_ERROR',
+      details: process.env.NODE_ENV === 'development' ? {
+        stack: error.stack,
+        type: typeof error,
+        name: error.name
+      } : undefined
+    };
+    
+    console.error('📤 发送错误响应给前端:', errorResponse);
+    
+    // 设置CORS和响应头
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');  
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Content-Type', 'application/json');
+    
+    res.status(500).json(errorResponse);
+    
+    console.error('📤 错误响应已发送');
   }
 });
 

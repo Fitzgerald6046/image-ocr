@@ -105,9 +105,12 @@ app.use(express.urlencoded({
 
 // 请求验证中间件
 app.use((req, res, next) => {
+  // 文件上传路径不要求JSON格式
+  const isUploadRequest = req.path === '/api/upload';
+  
   const validation = InputValidator.validateRequest(req, {
     checkOrigin: process.env.NODE_ENV === 'production',
-    requireJson: req.method === 'POST' && req.path.startsWith('/api/'),
+    requireJson: req.method === 'POST' && req.path.startsWith('/api/') && !isUploadRequest,
     maxBodySize: 10 * 1024 * 1024
   });
   
@@ -148,6 +151,19 @@ app.use((req, res, next) => {
     const responseTime = Date.now() - start;
     monitor.recordRequest(req, res, responseTime);
   });
+  
+  next();
+});
+
+// 安全响应头中间件
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  // 移除暴露服务器信息的头部
+  res.removeHeader('X-Powered-By');
   
   next();
 });
@@ -196,19 +212,6 @@ app.use('*', (req, res) => {
     error: 'API endpoint not found',
     message: `Path ${req.originalUrl} does not exist`
   });
-});
-
-// 安全响应头中间件
-app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  
-  // 移除暴露服务器信息的头部
-  res.removeHeader('X-Powered-By');
-  
-  next();
 });
 
 // 全局错误处理with监控
@@ -314,4 +317,4 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // 设置服务器超时
-server.timeout = 30000; // 30秒超时 
+server.timeout = 120000; // 120秒超时（2分钟）

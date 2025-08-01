@@ -27,13 +27,6 @@ class RateLimiter {
       },
       standardHeaders: true,
       legacyHeaders: false,
-      // 自定义键生成函数
-      keyGenerator: (req) => {
-        // 组合IP和User-Agent来生成更精确的限制
-        const ip = req.ip || req.connection.remoteAddress;
-        const userAgent = req.get('User-Agent') || '';
-        return `${ip}:${userAgent.substring(0, 50)}`;
-      },
       // 跳过成功的请求（可选）
       skipSuccessfulRequests: false,
       // 跳过失败的请求
@@ -99,11 +92,10 @@ class RateLimiter {
     return SlowDown({
       windowMs: 15 * 60 * 1000, // 15分钟
       delayAfter: 50, // 50个请求后开始延迟
-      delayMs: 500, // 每个额外请求增加500ms延迟
+      delayMs: () => 500, // 固定延迟500ms
       maxDelayMs: 5000, // 最大延迟5秒
-      keyGenerator: (req) => {
-        const ip = req.ip || req.connection.remoteAddress;
-        return ip;
+      validate: {
+        delayMs: false // 禁用delayMs验证警告
       }
     });
   }

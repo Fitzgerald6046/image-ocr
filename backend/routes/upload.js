@@ -49,10 +49,11 @@ const storage = multer.diskStorage({
 // 文件过滤器 - 增强验证
 const fileFilter = (req, file, cb) => {
   try {
-    // 验证请求
+    // 验证请求 - 跳过JSON检查，因为文件上传使用multipart/form-data
     const validation = InputValidator.validateRequest(req, {
       checkOrigin: process.env.NODE_ENV === 'production',
-      maxBodySize: MAX_FILE_SIZE
+      maxBodySize: MAX_FILE_SIZE,
+      requireJson: false // 文件上传不需要JSON格式
     });
     
     if (!validation.valid) {
