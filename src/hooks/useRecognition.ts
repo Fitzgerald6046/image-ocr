@@ -9,6 +9,7 @@ export const useRecognition = () => {
 
   const handleRecognize = useCallback(async () => {
     console.log('🔍 开始识别流程...');
+    console.log('🔍 useRecognition hook 被调用!');
     const { uploadedImage, selectedModel, recognitionType, isRecognizing } = state;
     
     console.log('uploadedImage:', uploadedImage);
@@ -103,6 +104,8 @@ export const useRecognition = () => {
       };
       console.log('请求数据:', requestData);
 
+      console.log('🚀 发送请求到:', getApiUrl(API_CONFIG.endpoints.recognition));
+      
       const response = await fetch(getApiUrl(API_CONFIG.endpoints.recognition), {
         method: 'POST',
         headers: {
@@ -111,18 +114,42 @@ export const useRecognition = () => {
         body: JSON.stringify(requestData)
       });
       
-      console.log('响应状态:', response.status, response.statusText);
+      console.log('📡 响应状态:', response.status, response.statusText);
+      console.log('📡 响应头:', response.headers);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ HTTP错误响应:', errorText);
+        let errorText;
+        try {
+          errorText = await response.text();
+          console.error('❌ HTTP错误响应内容:', errorText);
+        } catch (textError) {
+          console.error('❌ 无法读取错误响应内容:', textError);
+          errorText = '无法读取服务器响应';
+        }
         throw new Error(`识别失败: ${response.status} ${response.statusText}\n${errorText}`);
       }
       
-      const result = await response.json();
-      console.log('✅ 后端响应:', result);
+      let result;
+      try {
+        result = await response.json();
+        console.log('✅ 后端响应:', result);
+        console.log('📋 响应数据类型:', typeof result);
+        console.log('📋 success字段:', result.success);
+        console.log('📋 recognition字段存在:', !!result.recognition);
+      } catch (jsonError) {
+        console.error('❌ JSON解析失败:', jsonError);
+        const responseText = await response.text();
+        console.error('❌ 原始响应内容:', responseText);
+        throw new Error(`响应解析失败: ${jsonError.message}`);
+      }
       
-      if (result.success) {
+      if (result.recognition) {
+        console.log('📋 recognition内容长度:', result.recognition.content?.length);
+        console.log('📋 recognition内容前200字符:', result.recognition.content?.substring(0, 200));
+      }
+      
+      // 检查响应是否包含识别结果，不管success字段如何
+      if (result.recognition && result.recognition.content) {
         const recognitionData = {
           type: recognitionType,
           content: result.recognition.content,
@@ -159,7 +186,12 @@ export const useRecognition = () => {
         
         console.log('✅ 图片识别完成');
       } else {
-        throw new Error(result.message || '识别失败');
+        console.error('❌ 响应格式错误或缺少识别内容:');
+        console.error('   result.success:', result.success);
+        console.error('   result.recognition存在:', !!result.recognition);
+        console.error('   result.recognition.content存在:', !!result.recognition?.content);
+        console.error('   完整响应对象:', result);
+        throw new Error(result.message || result.error || `识别失败: 响应格式不正确`);
       }
     } catch (error) {
       console.error('❌ 识别过程出错:', error);

@@ -11,8 +11,15 @@ import { ThemeManager } from './utils/themeManager';
 const AppContent: React.FC = () => {
   const { state, dispatch } = useAppContext();
 
+  // 添加调试日志
+  useEffect(() => {
+    console.log('🚀 前端应用已加载 - App.tsx');
+    console.log('📋 当前应用状态:', state);
+  }, []);
+
   // 初始化主题
   useEffect(() => {
+    console.log('🎨 初始化主题管理器');
     ThemeManager.init();
   }, []);
 

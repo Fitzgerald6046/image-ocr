@@ -16,6 +16,21 @@ const RecognizeButton: React.FC<RecognizeButtonProps> = ({
 }) => {
   const canRecognize = uploadedImage && selectedModel && !isRecognizing;
 
+  const handleClick = () => {
+    console.log('🔘 识别按钮被点击');
+    console.log('   canRecognize:', canRecognize);
+    console.log('   uploadedImage:', !!uploadedImage);
+    console.log('   selectedModel:', selectedModel);
+    console.log('   isRecognizing:', isRecognizing);
+    
+    if (canRecognize) {
+      console.log('🚀 调用 onRecognize 函数');
+      onRecognize();
+    } else {
+      console.log('❌ 无法识别，条件不满足');
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-blue-100">
       <div className="p-4 border-b border-gray-100">
@@ -53,12 +68,7 @@ const RecognizeButton: React.FC<RecognizeButtonProps> = ({
 
         {/* 识别按钮 */}
         <button
-          onClick={() => {
-            console.log('🚀 识别按钮点击 - 准备识别');
-            console.log('图片:', uploadedImage);
-            console.log('模型:', selectedModel);
-            onRecognize();
-          }}
+          onClick={handleClick}
           disabled={!canRecognize}
           className={`
             w-full px-6 py-4 rounded-lg font-bold text-lg transition-all duration-200 flex items-center justify-center gap-3
